@@ -169,7 +169,8 @@ export async function generateFlashCards(batchSize: number = 5) {
             contents: `Generate 5 high-quality PSC Flashcards for these topics: ${targetTopics.map(t => t.topic).join(', ')}.
             
             Flashcards should be in Malayalam.
-            Front: A clear question or term.
+            Front: A clear question or term. 
+            IMPORTANT: Do NOT use "താഴെ പറയുന്നവയിൽ നിന്നും" (from the following) or list-based questions. Rephrase them into direct questions.
             Back: The concise answer.
             Explanation: A detailed explanation of the answer.
             
@@ -202,7 +203,17 @@ export async function generateFlashCards(batchSize: number = 5) {
                 explanation: item.explanation
             }));
             
-            await upsertSupabaseData('flashcards', sbData);
+            try {
+                await upsertSupabaseData('flashcards', sbData);
+            } catch (err: any) {
+                if (err.message.includes('explanation')) {
+                    console.warn("Explanation column missing in flashcards, retrying without it.");
+                    const stripped = sbData.map(({ explanation, ...rest }: any) => rest);
+                    await upsertSupabaseData('flashcards', stripped);
+                } else {
+                    throw err;
+                }
+            }
             for (const f of sbData) {
                 await findAndUpsertRow('FlashCards', String(f.id), [f.id, f.front, f.back, f.topic, f.explanation]);
             }

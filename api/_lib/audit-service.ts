@@ -109,7 +109,17 @@ export async function auditAndCorrectQuestions() {
         const updates = result.audited || [];
 
         if (updates.length > 0) {
-            await upsertSupabaseData('questionbank', updates);
+            try {
+                await upsertSupabaseData('questionbank', updates);
+            } catch (err: any) {
+                if (err.message.includes('explanation')) {
+                    console.warn("Explanation column missing in questionbank, retrying without it.");
+                    const stripped = updates.map(({ explanation, ...rest }: any) => rest);
+                    await upsertSupabaseData('questionbank', stripped);
+                } else {
+                    throw err;
+                }
+            }
             for (const q of updates) {
                 await findAndUpsertRow('QuestionBank', String(q.id), [
                     q.id, q.topic || '', q.question, JSON.stringify(q.options), q.correct_answer_index, q.subject, q.difficulty || 'PSC Level', q.explanation

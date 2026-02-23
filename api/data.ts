@@ -150,6 +150,15 @@ export default async function handler(req: any, res: any) {
             }
 
             const { data, error } = await query;
+            if (error) {
+                console.error(`Supabase Query Error [${tableName}]:`, error.message);
+                // If it's a schema cache error, we trigger the fallback to sheets
+                if (!error.message.includes('schema cache') && !error.message.includes('column')) {
+                    throw error;
+                }
+                console.warn("Schema mismatch detected, falling back to Sheets.");
+            }
+            
             if (!error && data && data.length > 0) {
                 if (tableName === 'questionbank') {
                     const processedQuestions = data.map(q => {
