@@ -139,6 +139,80 @@ export const findAndUpsertRow = async (sheetName: string, id: string, newRowData
     } catch (e: any) { throw e; }
 };
 
+export const batchUpsertRows = async (sheetName: string, rowsToUpsert: { id: string, data: any[] }[]) => {
+    if (!rowsToUpsert.length) return;
+    try {
+        const spreadsheetId = getSpreadsheetId();
+        const sheets = await getSheetsClient();
+        
+        // Ensure sheet exists
+        let existingRows: any[][] = [];
+        try {
+            const response = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${sheetName}!A:A` });
+            existingRows = response.data.values || [];
+        } catch (err: any) {
+            if (err.message && err.message.includes('Unable to parse range')) {
+                await sheets.spreadsheets.batchUpdate({
+                    spreadsheetId,
+                    requestBody: {
+                        requests: [{ addSheet: { properties: { title: sheetName } } }]
+                    }
+                });
+            } else {
+                throw err;
+            }
+        }
+
+        const dataToUpdate: any[] = [];
+        const dataToAppend: any[] = [];
+
+        for (const row of rowsToUpsert) {
+            const rowIndex = existingRows.findIndex(r => String(r[0]).trim() === String(row.id).trim());
+            if (rowIndex !== -1) {
+                dataToUpdate.push({
+                    range: `${sheetName}!A${rowIndex + 1}`,
+                    values: [row.data]
+                });
+            } else {
+                dataToAppend.push(row.data);
+            }
+        }
+
+        // Perform batch updates
+        if (dataToUpdate.length > 0) {
+            // Split into chunks of 50 to avoid large payload errors and stay safe with quota
+            for (let i = 0; i < dataToUpdate.length; i += 50) {
+                const chunk = dataToUpdate.slice(i, i + 50);
+                await sheets.spreadsheets.values.batchUpdate({
+                    spreadsheetId,
+                    requestBody: {
+                        valueInputOption: 'USER_ENTERED',
+                        data: chunk
+                    }
+                });
+                if (dataToUpdate.length > 50) await new Promise(r => setTimeout(r, 1000)); // 1s delay between chunks
+            }
+        }
+
+        // Perform append for new rows
+        if (dataToAppend.length > 0) {
+            for (let i = 0; i < dataToAppend.length; i += 50) {
+                const chunk = dataToAppend.slice(i, i + 50);
+                await sheets.spreadsheets.values.append({
+                    spreadsheetId,
+                    range: `${sheetName}!A1`,
+                    valueInputOption: 'USER_ENTERED',
+                    requestBody: { values: chunk }
+                });
+                if (dataToAppend.length > 50) await new Promise(r => setTimeout(r, 1000)); // 1s delay between chunks
+            }
+        }
+    } catch (e: any) {
+        console.error(`Batch Upsert Error (${sheetName}):`, e.message);
+        throw e;
+    }
+};
+
 export const deleteRowById = async (sheetName: string, id: string) => {
     try {
         const spreadsheetId = getSpreadsheetId();

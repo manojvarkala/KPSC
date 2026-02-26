@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { readSheetData, findAndUpsertRow } from './sheets-service.js';
+import { readSheetData, findAndUpsertRow, batchUpsertRows } from './sheets-service.js';
 import { supabase, upsertSupabaseData } from './supabase-service.js';
 
 declare var process: any;
@@ -143,12 +143,12 @@ export async function generateQuestionsForGaps(batchSizeOrTopic: number | string
             // Save to Supabase
             await upsertSupabaseData('questionbank', sbData);
             
-            // Save to Sheets - batching would be better but findAndUpsertRow is what we have
-            // We'll use a Promise.all to speed it up slightly but be careful with rate limits
-            const sheetPromises = sbData.map((q: any) => 
-                findAndUpsertRow('QuestionBank', String(q.id), [q.id, q.topic, q.question, JSON.stringify(q.options), q.correct_answer_index, q.subject, q.difficulty, q.explanation])
-            );
-            await Promise.all(sheetPromises);
+            // Save to Sheets using batchUpsertRows
+            const sheetRows = sbData.map((q: any) => ({
+                id: String(q.id),
+                data: [q.id, q.topic, q.question, JSON.stringify(q.options), q.correct_answer_index, q.subject, q.difficulty, q.explanation]
+            }));
+            await batchUpsertRows('QuestionBank', sheetRows);
             
             return { message: `Generated ${sbData.length} questions for ${targetMappings.map(m => m.topic).join(', ')}.` };
         }
@@ -472,9 +472,11 @@ export async function repairBlankTopics() {
             });
             
             await upsertSupabaseData('questionbank', finalData);
-            for (const q of finalData) {
-                await findAndUpsertRow('QuestionBank', String(q.id), [q.id, q.topic, q.question, JSON.stringify(q.options), q.correct_answer_index, q.subject, q.difficulty, q.explanation]);
-            }
+            const sheetRows = finalData.map(q => ({
+                id: String(q.id),
+                data: [q.id, q.topic, q.question, JSON.stringify(q.options), q.correct_answer_index, q.subject, q.difficulty, q.explanation]
+            }));
+            await batchUpsertRows('QuestionBank', sheetRows);
             return { message: `Successfully repaired topics for ${finalData.length} questions.` };
         }
     } catch (e: any) { 
@@ -500,14 +502,16 @@ export async function syncSupabaseToSheets() {
         if (error) continue;
         if (!data || data.length === 0) continue;
 
-        for (const row of data) {
+        const sheetRows = data.map(row => {
             const values = t.cols.map(col => {
                 const val = row[col];
                 return typeof val === 'object' ? JSON.stringify(val) : val;
             });
-            await findAndUpsertRow(t.name, String(row.id), values);
-            totalUpdated++;
-        }
+            return { id: String(row.id), data: values };
+        });
+
+        await batchUpsertRows(t.name, sheetRows);
+        totalUpdated += sheetRows.length;
     }
     return { message: `Pushed ${totalUpdated} records from Supabase to Sheets.` };
 }
