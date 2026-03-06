@@ -7,6 +7,13 @@ import { SparklesIcon } from '../icons/SparklesIcon';
 import AiDisclaimer from '../AiDisclaimer';
 
 const Card: React.FC<{ card: FlashCard }> = ({ card }) => {
+    const [revealed, setRevealed] = useState(false);
+
+    // Reset revealed state when the card changes
+    useEffect(() => {
+        setRevealed(false);
+    }, [card.id, card.front]);
+
     return (
         <div className="w-full max-w-4xl mx-auto min-h-[400px] md:h-[500px] flex flex-col md:flex-row shadow-2xl rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 relative bg-[#fdfbf7] dark:bg-slate-900">
             {/* Book Spine / Center Fold (Desktop) */}
@@ -35,21 +42,33 @@ const Card: React.FC<{ card: FlashCard }> = ({ card }) => {
                 <div className="hidden md:block absolute top-0 bottom-0 right-6 w-[1px] bg-black/5"></div>
                 <div className="hidden md:block absolute top-0 bottom-0 right-8 w-[1px] bg-black/5"></div>
                 
-                <div className="relative z-10 flex flex-col h-full justify-center">
-                    <div className="flex items-start space-x-3 mb-6">
-                        <div className="h-6 md:h-8 w-1.5 bg-emerald-500 rounded-full shrink-0 mt-1"></div>
-                        <h3 className="text-lg md:text-2xl font-black text-slate-800 dark:text-white leading-relaxed font-serif">{card.back}</h3>
-                    </div>
-                    
-                    {card.explanation && (
-                        <div className="flex-1 mt-2 md:mt-4">
-                            <p className="text-[10px] font-black opacity-40 uppercase tracking-widest mb-2 md:mb-3 text-slate-500">Explanation</p>
-                            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 md:p-6 rounded-2xl text-xs md:text-sm font-medium leading-relaxed text-slate-600 dark:text-slate-300 border border-slate-100 dark:border-slate-800 shadow-inner">
-                                {card.explanation}
-                            </div>
+                {!revealed ? (
+                    <div 
+                        className="relative z-10 flex flex-col items-center justify-center h-full cursor-pointer group"
+                        onClick={() => setRevealed(true)}
+                    >
+                        <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform">
+                            <SparklesIcon className="h-8 w-8 text-indigo-500" />
                         </div>
-                    )}
-                </div>
+                        <p className="text-sm font-black text-slate-500 uppercase tracking-widest group-hover:text-indigo-600 transition-colors text-center">Click to Reveal Answer</p>
+                    </div>
+                ) : (
+                    <div className="relative z-10 flex flex-col h-full justify-center animate-fade-in">
+                        <div className="flex items-start space-x-3 mb-6">
+                            <div className="h-6 md:h-8 w-1.5 bg-emerald-500 rounded-full shrink-0 mt-1"></div>
+                            <h3 className="text-lg md:text-2xl font-black text-slate-800 dark:text-white leading-relaxed font-serif">{card.back}</h3>
+                        </div>
+                        
+                        {card.explanation && (
+                            <div className="flex-1 mt-2 md:mt-4">
+                                <p className="text-[10px] font-black opacity-40 uppercase tracking-widest mb-2 md:mb-3 text-slate-500">Explanation</p>
+                                <div className="bg-slate-50 dark:bg-slate-800/50 p-4 md:p-6 rounded-2xl text-xs md:text-sm font-medium leading-relaxed text-slate-600 dark:text-slate-300 border border-slate-100 dark:border-slate-800 shadow-inner">
+                                    {card.explanation}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );
