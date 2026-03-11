@@ -15,7 +15,8 @@ import {
     repairLanguageMismatches,
     repairBlankTopics,
     backfillExplanations,
-    bulkUploadQuestions
+    bulkUploadQuestions,
+    APPROVED_SUBJECTS
 } from "./_lib/scraper-service.js";
 import { auditAndCorrectQuestions } from "./_lib/audit-service.js";
 import { supabase, upsertSupabaseData, deleteSupabaseRow } from "./_lib/supabase-service.js";
@@ -107,7 +108,11 @@ export default async function handler(req: any, res: any) {
                 const { data: qData } = await supabase.from('questionbank').select('topic, subject');
                 
                 const emptyTopics = (sData || []).filter(s => {
-                    const sTopic = String(s.topic || s.title).toLowerCase().trim();
+                    let t = s.topic;
+                    if (!t || t === 'null' || t.trim() === '') t = s.title;
+                    if (!t || t === 'null' || t.trim() === '') t = "Unnamed Topic";
+                    
+                    const sTopic = String(t).toLowerCase().trim();
                     const hasQuestions = qData?.some(q => {
                         const qTopic = String(q.topic || '').toLowerCase().trim();
                         const qSubject = String(q.subject || '').toLowerCase().trim();
@@ -116,7 +121,12 @@ export default async function handler(req: any, res: any) {
                         return false;
                     });
                     return !hasQuestions;
-                }).map(s => s.topic || s.title);
+                }).map(s => {
+                    let t = s.topic;
+                    if (!t || t === 'null' || t.trim() === '') t = s.title;
+                    if (!t || t === 'null' || t.trim() === '') t = "Unnamed Topic";
+                    return t;
+                });
 
                 if (emptyTopics.length === 0) return res.status(200).json({ message: "No empty topics found." });
                 const batch = emptyTopics.slice(0, 5);
@@ -133,7 +143,7 @@ export default async function handler(req: any, res: any) {
             case 'get-audit-report': {
                 if (!supabase) throw new Error("Supabase required.");
                 const { data: qData } = await supabase.from('questionbank').select('topic, subject');
-                const { data: sData } = await supabase.from('syllabus').select('id, topic, title');
+                const { data: sData } = await supabase.from('syllabus').select('id, topic, title, subject');
                 
                 let unclassifiedCount = 0;
                 qData?.forEach(q => { 
@@ -141,8 +151,24 @@ export default async function handler(req: any, res: any) {
                     if (s === 'other' || s.includes('manual') || s === '' || s === 'null') unclassifiedCount++;
                 });
 
+                const approvedLower = APPROVED_SUBJECTS.map(s => s.toLowerCase().trim());
+                const subjectMismatches: string[] = [];
+
                 const gapReport = (sData || []).map(s => {
-                    const sTopic = String(s.topic || s.title).toLowerCase().trim();
+                    let topicName = s.topic;
+                    if (!topicName || topicName === 'null' || topicName.trim() === '') {
+                        topicName = s.title;
+                    }
+                    if (!topicName || topicName === 'null' || topicName.trim() === '') {
+                        topicName = "Unnamed Topic";
+                    }
+                    
+                    const sTopic = String(topicName).toLowerCase().trim();
+                    const sSubject = String(s.subject || '').trim();
+
+                    if (sSubject && !approvedLower.includes(sSubject.toLowerCase().trim())) {
+                        if (!subjectMismatches.includes(sSubject)) subjectMismatches.push(sSubject);
+                    }
                     
                     // Robust matching: Exact match or partial match for meaningful topics
                     const count = qData?.filter(q => {
@@ -159,10 +185,15 @@ export default async function handler(req: any, res: any) {
                         return false;
                     }).length || 0;
 
-                    return { id: s.id, topic: s.topic || s.title, count };
+                    return { id: s.id, topic: topicName, count, subject: s.subject };
                 });
 
-                return res.status(200).json({ syllabusReport: gapReport, unclassifiedCount });
+                return res.status(200).json({ 
+                    syllabusReport: gapReport, 
+                    unclassifiedCount,
+                    subjectMismatches,
+                    approvedSubjects: APPROVED_SUBJECTS
+                });
             }
             case 'delete-row': await deleteRowById(sheet, id); if (supabase) await deleteSupabaseRow(sheet, id); return res.status(200).json({ message: 'Item deleted.' });
             default: return res.status(400).json({ error: 'Invalid Action' });

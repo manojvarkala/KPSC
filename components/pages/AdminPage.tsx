@@ -36,6 +36,8 @@ type AdminTab = 'automation' | 'qbank' | 'exams' | 'syllabus' | 'books' | 'users
 interface AuditReport {
     syllabusReport: { id: string; topic: string; count: number }[];
     unclassifiedCount: number;
+    subjectMismatches: string[];
+    approvedSubjects: string[];
 }
 
 const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
@@ -128,7 +130,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         try {
             const r = await adminOp(action, payload);
             setStatus(r.message || "Action completed successfully.");
-            if (['delete-row', 'rebuild-db', 'sync-to-sheets', 'run-daily-sync', 'run-book-scraper', 'update-setting', 'save-row', 'run-batch-qa', 'run-language-repair', 'run-topic-repair', 'run-explanation-repair', 'run-all-gaps'].includes(action)) {
+            if (['delete-row', 'rebuild-db', 'sync-to-sheets', 'run-daily-sync', 'run-book-scraper', 'update-setting', 'save-row', 'run-batch-qa', 'run-language-repair', 'run-topic-repair', 'run-explanation-repair', 'run-all-gaps', 'run-targeted-gap-fill'].includes(action)) {
                 await refreshData(true);
             }
         } catch(e:any) { setStatus(e.message); setIsError(true); }
@@ -257,6 +259,36 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     </div>
                                 </div>
 
+                                {auditReport?.subjectMismatches && auditReport.subjectMismatches.length > 0 && (
+                                    <div className="bg-red-50 dark:bg-red-900/20 p-8 rounded-[2.5rem] border-2 border-red-100 dark:border-red-800 shadow-xl">
+                                        <div className="flex items-center space-x-3 mb-4">
+                                            <XMarkIcon className="h-6 w-6 text-red-600" />
+                                            <h4 className="text-sm font-black uppercase tracking-tight text-red-700">Subject Naming Mismatches Detected</h4>
+                                        </div>
+                                        <p className="text-xs font-bold text-red-600/80 mb-4 uppercase tracking-widest">
+                                            The following subjects in your Syllabus do not match the App's "Approved Subjects" list. 
+                                            This will cause AI generation to fail or categorize questions incorrectly.
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {auditReport.subjectMismatches.map(s => (
+                                                <span key={s} className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-[9px] font-black uppercase border border-red-200">
+                                                    {s}
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <div className="mt-6 pt-6 border-t border-red-100 dark:border-red-800">
+                                            <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-2">Approved List (Use these exactly):</p>
+                                            <div className="flex flex-wrap gap-1">
+                                                {auditReport.approvedSubjects.map(s => (
+                                                    <span key={s} className="bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded text-[8px] font-bold">
+                                                        {s}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="bg-slate-50 dark:bg-slate-900 rounded-[2.5rem] overflow-hidden border dark:border-slate-800 shadow-xl">
                                     <table className="w-full text-left">
                                         <thead className="bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase text-slate-500">
@@ -272,7 +304,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                         </span>
                                                     </td>
                                                     <td className="px-8 py-6 text-right">
-                                                        <button onClick={() => handleAction('run-targeted-gap-fill', { topic: report.topic })} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg">
+                                                        <button onClick={() => handleAction('run-targeted-gap-fill', { topic: report.id })} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg">
                                                             <SparklesIcon className="h-4 w-4" />
                                                         </button>
                                                     </td>

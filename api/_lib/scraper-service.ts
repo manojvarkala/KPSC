@@ -33,7 +33,7 @@ const ensureArray = (raw: any): string[] => {
     }
 };
 
-const APPROVED_SUBJECTS = [
+export const APPROVED_SUBJECTS = [
     "Arts, Culture & Sports", "Biology / Life Science", "Chemistry", "Computer Science / IT / Cyber Laws",
     "Current Affairs", "Educational Psychology / Pedagogy", "Electrical Engineering", "English",
     "Environment", "General Knowledge", "General Knowledge / Static GK", "General Science / Science & Tech",
@@ -106,8 +106,16 @@ export async function generateQuestionsForGaps(batchSizeOrTopic: number | string
     let targetMappings: { topic: string, subject: string }[] = [];
 
     if (typeof batchSizeOrTopic === 'string') {
-        const { data: mappings } = await supabase.from('syllabus').select('topic, subject, title, id').or(`topic.ilike.%${batchSizeOrTopic}%,title.ilike.%${batchSizeOrTopic}%,id.eq.${batchSizeOrTopic}`).limit(1);
-        if (mappings?.[0]) targetMappings = [{ topic: mappings[0].topic || mappings[0].title || batchSizeOrTopic, subject: mappings[0].subject || 'General Knowledge' }];
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(batchSizeOrTopic);
+        const queryOr = isUUID ? `id.eq.${batchSizeOrTopic}` : `topic.ilike.%${batchSizeOrTopic}%,title.ilike.%${batchSizeOrTopic}%`;
+        
+        const { data: mappings } = await supabase.from('syllabus').select('topic, subject, title, id').or(queryOr).limit(1);
+        if (mappings?.[0]) {
+            let t = mappings[0].topic;
+            if (!t || t === 'null' || t.trim() === '') t = mappings[0].title;
+            if (!t || t === 'null' || t.trim() === '') t = batchSizeOrTopic;
+            targetMappings = [{ topic: t, subject: mappings[0].subject || 'General Knowledge' }];
+        }
         else throw new Error(`Area "${batchSizeOrTopic}" not found.`);
     } else {
         const { data: sData } = await supabase.from('syllabus').select('topic, subject, title');
@@ -115,7 +123,12 @@ export async function generateQuestionsForGaps(batchSizeOrTopic: number | string
         const { data: qData } = await supabase.from('questionbank').select('topic');
         const counts: Record<string, number> = {};
         qData?.forEach(q => { const t = String(q.topic || '').toLowerCase().trim(); if (t) counts[t] = (counts[t] || 0) + 1; });
-        targetMappings = sData.map(s => ({ topic: s.topic || s.title, subject: s.subject || 'General Knowledge', count: counts[String(s.topic || s.title).toLowerCase().trim()] || 0 })).sort((a, b) => a.count - b.count).slice(0, batchSizeOrTopic as number);
+        targetMappings = sData.map(s => {
+            let t = s.topic;
+            if (!t || t === 'null' || t.trim() === '') t = s.title;
+            if (!t || t === 'null' || t.trim() === '') t = "Unnamed Topic";
+            return { topic: t, subject: s.subject || 'General Knowledge', count: counts[String(t).toLowerCase().trim()] || 0 };
+        }).sort((a, b) => a.count - b.count).slice(0, batchSizeOrTopic as number);
     }
 
     try {
