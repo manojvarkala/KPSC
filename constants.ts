@@ -252,6 +252,36 @@ export const MOCK_FLASHCARDS: FlashCard[] = [
     { id: 'fc5', front: 'അറബിക്കടലിന്റെ റാണി എന്നറിയപ്പെടുന്ന നഗരം ഏതാണ്?', back: 'കൊച്ചി', topic: 'Geography', explanation: 'പുരാതന കാലം മുതൽ ഒരു പ്രധാന സുഗന്ധവ്യഞ്ജന വ്യാപാര കേന്ദ്രമായിരുന്നതിനാലാണ് കൊച്ചിയെ അറബിക്കടലിന്റെ റാണി എന്ന് വിളിക്കുന്നത്.' }
 ];
 
+export const SYLLABUS_STRUCTURE = {
+  'GK / Current Affairs / History / Geography / Polity / Economy': [
+    'Indian History', 'Kerala History & Renaissance', 'World & Indian Geography', 'Kerala Geography', 
+    'Indian Economy & Kerala Economy', 'Indian Polity & Constitution', 'Kerala Polity & Administration', 
+    'Important Laws & Acts', 'Important National & International Events', 'Current Affairs & Renaissance', 
+    'Environment & Forestry', 'Kerala Specific'
+  ],
+  'Science / Technical / Engineering': [
+    'General Science - Physics', 'General Science - Chemistry', 'General Science - Biology & Public Health', 
+    'Electrical Circuits & Machines', 'Structural Engineering', 'Power Systems', 'Thermodynamics', 
+    'Civil Construction Basics', 'Mechanical Fitting', 'Electrical Wiring', 'Blood Banking Techniques', 
+    'Anatomy & Physiology', 'Medical Surgical Nursing', 'Pharmacology & Pharmaceutics', 'Public Health & Sanitation'
+  ],
+  'Languages / Literature': [
+    'Malayalam Grammar', 'Malayalam Vocabulary & Idioms', 'Grammar & Usage', 'Vocabulary & Comprehension', 
+    'Basic English', 'Malayalam Language', 'Sanskrit Literature & Grammar', 'English Literature & Language', 
+    'Arts Literature Culture & Sports'
+  ],
+  'Aptitude / Reasoning / Maths': [
+    'Basic Arithmetic', 'Mental Ability & Logical Reasoning', 'Arithmetic & Reasoning', 'Simple Maths', 'Algebra & Calculus'
+  ],
+  'Education / Pedagogy': [
+    'Teaching Aptitude & Pedagogy'
+  ],
+  'Specialized / Subject Specific': [
+    'Computer Basics & IT Awareness', 'Library Management', 'Police & Law', 'Excise Laws Basics', 
+    'Botany & Plant Physiology', 'Zoology & Animal Physiology', 'Organic & Inorganic Chemistry', 'Mechanics & Electromagnetism'
+  ]
+};
+
 export const MOCK_QUESTION_BANK: QuizQuestion[] = [];
 export const MOCK_NOTIFICATIONS: Notification[] = [];
 export const MOCK_PSC_UPDATES: PscUpdateItem[] = [];

@@ -43,6 +43,36 @@ export const APPROVED_SUBJECTS = [
     "Reasoning / Mental Ability", "Social Science / Sociology"
 ];
 
+export const SYLLABUS_STRUCTURE = {
+  'GK / Current Affairs / History / Geography / Polity / Economy': [
+    'Indian History', 'Kerala History & Renaissance', 'World & Indian Geography', 'Kerala Geography', 
+    'Indian Economy & Kerala Economy', 'Indian Polity & Constitution', 'Kerala Polity & Administration', 
+    'Important Laws & Acts', 'Important National & International Events', 'Current Affairs & Renaissance', 
+    'Environment & Forestry', 'Kerala Specific'
+  ],
+  'Science / Technical / Engineering': [
+    'General Science - Physics', 'General Science - Chemistry', 'General Science - Biology & Public Health', 
+    'Electrical Circuits & Machines', 'Structural Engineering', 'Power Systems', 'Thermodynamics', 
+    'Civil Construction Basics', 'Mechanical Fitting', 'Electrical Wiring', 'Blood Banking Techniques', 
+    'Anatomy & Physiology', 'Medical Surgical Nursing', 'Pharmacology & Pharmaceutics', 'Public Health & Sanitation'
+  ],
+  'Languages / Literature': [
+    'Malayalam Grammar', 'Malayalam Vocabulary & Idioms', 'Grammar & Usage', 'Vocabulary & Comprehension', 
+    'Basic English', 'Malayalam Language', 'Sanskrit Literature & Grammar', 'English Literature & Language', 
+    'Arts Literature Culture & Sports'
+  ],
+  'Aptitude / Reasoning / Maths': [
+    'Basic Arithmetic', 'Mental Ability & Logical Reasoning', 'Arithmetic & Reasoning', 'Simple Maths', 'Algebra & Calculus'
+  ],
+  'Education / Pedagogy': [
+    'Teaching Aptitude & Pedagogy'
+  ],
+  'Specialized / Subject Specific': [
+    'Computer Basics & IT Awareness', 'Library Management', 'Police & Law', 'Excise Laws Basics', 
+    'Botany & Plant Physiology', 'Zoology & Animal Physiology', 'Organic & Inorganic Chemistry', 'Mechanics & Electromagnetism'
+  ]
+};
+
 /**
  * BULK UPLOAD LOGIC: Handles manual entries
  */
@@ -135,11 +165,16 @@ export async function generateQuestionsForGaps(batchSizeOrTopic: number | string
         const ai = getAi();
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview', 
-            contents: `Generate 5 Kerala PSC MCQs for: ${targetMappings.map(m => `${m.subject} -> ${m.topic}`).join(', ')}.
+            contents: `Generate 5 high-quality Kerala PSC MCQs for: ${targetMappings.map(m => `${m.subject} -> ${m.topic}`).join(', ')}.
             
+            CONTEXT (Micro-topics grouped by category):
+            ${JSON.stringify(SYLLABUS_STRUCTURE, null, 2)}
+
             CRITICAL RULES:
             1. Subject field MUST be exactly one from this list: [${APPROVED_SUBJECTS.join(', ')}]
             2. Topic field MUST be exactly the topic name provided above (e.g. if I asked for "Computer", the topic must be "Computer").
+            3. Questions must be in Malayalam.
+            4. Explanations must be in Malayalam.
             
             JSON format: { "topic": "string", "subject": "string", "question": "string", "options": ["A","B","C","D"], "correctAnswerIndex": 1-4, "explanation": "string" }`,
             config: { responseMimeType: "application/json" }

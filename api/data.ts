@@ -57,32 +57,35 @@ const normalizeSubject = (subject: string, topic: string, question: string = '')
     if (context.includes('kerala geo') || context.includes('കേരള ഭൂമിശാസ്ത്രം') || context.includes('river') || context.includes('district')) {
         if (context.includes('kerala')) return "Kerala Geography";
     }
-    if (context.includes('kerala gk') || context.includes('കേരള സംബന്ധിയായ')) return "Kerala Specific GK";
+    if (context.includes('kerala gk') || context.includes('കേരള സംബന്ധിയായ') || context.includes('kerala specific')) return "Kerala Specific GK";
     
     if (context.includes('indian history') || context.includes('ഇന്ത്യൻ ചരിത്രം') || context.includes('freedom struggle')) return "Indian History";
-    if (context.includes('indian geo') || context.includes('ഇന്ത്യൻ ഭൂമിശാസ്ത്രം') || context.includes('himalaya') || context.includes('ganga')) return "Indian Geography";
-    if (context.includes('polity') || context.includes('const') || context.includes('ഭരണഘടന') || context.includes('article') || context.includes('panchayat')) return "Indian Polity / Constitution";
+    if (context.includes('indian geo') || context.includes('ഇന്ത്യൻ ഭൂമിശാസ്ത്രം') || context.includes('himalaya') || context.includes('ganga') || context.includes('world geography')) return "Indian Geography";
+    if (context.includes('polity') || context.includes('const') || context.includes('ഭരണഘടന') || context.includes('article') || context.includes('panchayat') || context.includes('administration')) return "Indian Polity / Constitution";
     if (context.includes('economy') || context.includes('സാമ്പത്തിക') || context.includes('gdp') || context.includes('budget')) return "Indian Economy";
     
-    if (context.includes('biology') || context.includes('ജീവശാസ്ത്രം') || context.includes('life science') || context.includes('cell') || context.includes('human body')) return "Biology / Life Science";
-    if (context.includes('chemistry') || context.includes('രസതന്ത്രം') || context.includes('element') || context.includes('formula')) return "Chemistry";
-    if (context.includes('physics') || context.includes('ഭൗതികശാസ്ത്രം') || context.includes('motion') || context.includes('energy')) return "Physics";
+    if (context.includes('biology') || context.includes('ജീവശാസ്ത്രം') || context.includes('life science') || context.includes('cell') || context.includes('human body') || context.includes('anatomy') || context.includes('physiology') || context.includes('botany') || context.includes('zoology')) return "Biology / Life Science";
+    if (context.includes('chemistry') || context.includes('രസതന്ത്രം') || context.includes('element') || context.includes('formula') || context.includes('organic') || context.includes('inorganic')) return "Chemistry";
+    if (context.includes('physics') || context.includes('ഭൗതികശാസ്ത്രം') || context.includes('motion') || context.includes('energy') || context.includes('mechanics') || context.includes('electromagnetism')) return "Physics";
     if (context.includes('gen science') || context.includes('ശാസ്ത്രം') || context.includes('tech') || context.includes('space')) return "General Science / Science & Tech";
     
-    if (context.includes('math') || context.includes('arithmetic') || context.includes('ഗണിതം') || context.includes('percentage') || context.includes('interest')) return "Quantitative Aptitude";
+    if (context.includes('math') || context.includes('arithmetic') || context.includes('ഗണിതം') || context.includes('percentage') || context.includes('interest') || context.includes('algebra') || context.includes('calculus')) return "Quantitative Aptitude";
     if (context.includes('reasoning') || context.includes('logic') || context.includes('mental') || context.includes('coding-decoding')) return "Reasoning / Mental Ability";
     
     if (context.includes('it') || context.includes('computer') || context.includes('cyber') || context.includes('internet') || context.includes('software')) return "Computer Science / IT / Cyber Laws";
-    if (context.includes('english') || context.includes('ഇംഗ്ലീഷ്') || context.includes('grammar') || context.includes('synonym')) return "English";
+    if (context.includes('english') || context.includes('ഇംഗ്ലീഷ്') || context.includes('grammar') || context.includes('synonym') || context.includes('vocabulary')) return "English";
     if (context.includes('malayalam') || context.includes('മലയാളം') || context.includes('സാഹിത്യം')) return "Malayalam";
     
     if (context.includes('arts') || context.includes('sports') || context.includes('culture') || context.includes('കായികം') || context.includes('award') || context.includes('film')) return "Arts, Culture & Sports";
-    if (context.includes('nursing') || context.includes('health') || context.includes('മെഡിക്കൽ') || context.includes('disease')) return "Nursing Science / Health Care";
-    if (context.includes('electrical') || context.includes('എഞ്ചിനീയറിംഗ്')) return "Electrical Engineering";
+    if (context.includes('nursing') || context.includes('health') || context.includes('മെഡിക്കൽ') || context.includes('disease') || context.includes('pharmacology') || context.includes('sanitation')) return "Nursing Science / Health Care";
+    if (context.includes('electrical') || context.includes('എഞ്ചിനീയറിംഗ്') || context.includes('circuits') || context.includes('power systems')) return "Electrical Engineering";
     if (context.includes('psychology') || context.includes('pedagogy') || context.includes('ബോധന') || context.includes('teaching')) return "Educational Psychology / Pedagogy";
-    if (context.includes('environment') || context.includes('പരിസ്ഥിതി') || context.includes('pollution') || context.includes('climate')) return "Environment";
+    if (context.includes('environment') || context.includes('പരിസ്ഥിതി') || context.includes('pollution') || context.includes('climate') || context.includes('forestry')) return "Environment";
     if (context.includes('social science') || context.includes('sociology') || context.includes('സമൂഹ')) return "Social Science / Sociology";
     if (context.includes('current') || context.includes('news') || context.includes('ആനുകാലികം')) return "Current Affairs";
+    
+    if (context.includes('law') || context.includes('acts') || context.includes('police') || context.includes('excise')) return "General Knowledge";
+    if (context.includes('library')) return "General Knowledge";
 
     // 2. Static GK Fallback
     if (context.includes('gk') || context.includes('first in') || context.includes('largest')) return "General Knowledge / Static GK";
