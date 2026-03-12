@@ -496,15 +496,48 @@ export async function repairLanguageMismatches() {
 export async function repairBlankTopics() {
     if (!supabase) throw new Error("Supabase required.");
     
-    // Fetch questions with blank topics or subjects
-    const { data: missing, error } = await supabase
+    // 1. Try to find questions with blank topics or subjects first (highest priority)
+    const { data: blanks, error: blankErr } = await supabase
         .from('questionbank')
         .select('*')
         .or('topic.is.null,topic.eq."",subject.is.null,subject.eq.""')
         .limit(20);
         
-    if (error) throw error;
-    if (!missing || missing.length === 0) return { message: "No questions with blank topics found." };
+    if (blankErr) throw blankErr;
+    
+    let toRepair = blanks || [];
+    
+    // 2. If no blanks, look for subjects not in the approved list
+    if (toRepair.length < 20) {
+        const approvedListString = `(${APPROVED_SUBJECTS.map(s => `"${s}"`).join(',')})`;
+        const { data: invalid, error: invErr } = await supabase
+            .from('questionbank')
+            .select('*')
+            .not('subject', 'in', approvedListString)
+            .limit(20 - toRepair.length);
+            
+        if (invErr) {
+            console.warn("Invalid subject query failed (likely due to special characters), falling back to batch check.");
+        } else if (invalid && invalid.length > 0) {
+            toRepair = [...toRepair, ...invalid];
+        }
+    }
+
+    // 3. Fallback: If still nothing found via targeted queries, check a random batch
+    if (toRepair.length === 0) {
+        const { data: batch } = await supabase
+            .from('questionbank')
+            .select('*')
+            .limit(200);
+            
+        toRepair = (batch || []).filter(q => 
+            !q.topic || q.topic.trim() === "" || 
+            !q.subject || q.subject.trim() === "" || 
+            !APPROVED_SUBJECTS.includes(q.subject)
+        ).slice(0, 20);
+    }
+        
+    if (toRepair.length === 0) return { message: "No questions needing repair found." };
 
     try {
         const ai = getAi();
@@ -512,10 +545,13 @@ export async function repairBlankTopics() {
             model: 'gemini-3-flash-preview',
             contents: `Analyze these Kerala PSC questions and assign the most appropriate Topic and Subject for each.
             
-            Subject MUST be from this list: [${APPROVED_SUBJECTS.join(', ')}]
+            CRITICAL: Subject MUST be exactly one from this list: [${APPROVED_SUBJECTS.join(', ')}]
             Topic should be a specific micro-topic (e.g., "Rivers of Kerala", "Fundamental Rights", "Percentage").
             
-            Questions: ${JSON.stringify(missing.map(q => ({ id: q.id, question: q.question })))}
+            Syllabus Context for mapping:
+            ${JSON.stringify(SYLLABUS_STRUCTURE, null, 2)}
+            
+            Questions to repair: ${JSON.stringify(toRepair.map(q => ({ id: q.id, question: q.question, currentSubject: q.subject, currentTopic: q.topic })))}
             
             Return JSON array: [{ "id": number, "topic": "string", "subject": "string" }]`,
             config: { responseMimeType: "application/json" }
@@ -523,7 +559,7 @@ export async function repairBlankTopics() {
         
         const updates = JSON.parse(response.text || "[]");
         if (updates.length > 0) {
-            const finalData = missing.map(q => {
+            const finalData = toRepair.map(q => {
                 const update = updates.find((u: any) => u.id == q.id);
                 return { 
                     ...q, 
@@ -538,7 +574,7 @@ export async function repairBlankTopics() {
                 data: [q.id, q.topic, q.question, JSON.stringify(q.options), q.correct_answer_index, q.subject, q.difficulty, q.explanation]
             }));
             await batchUpsertRows('QuestionBank', sheetRows);
-            return { message: `Successfully repaired topics for ${finalData.length} questions.` };
+            return { message: `Successfully repaired ${finalData.length} questions (Fixed blanks or unapproved subjects).` };
         }
     } catch (e: any) { 
         console.error("Topic Repair Error:", e.message);

@@ -153,6 +153,17 @@ export default async function handler(req: any, res: any) {
 
                 const approvedLower = APPROVED_SUBJECTS.map(s => s.toLowerCase().trim());
                 const subjectMismatches: string[] = [];
+                let questionSubjectMismatches = 0;
+
+                qData?.forEach(q => { 
+                    const s = String(q.subject || '').trim();
+                    if (s === 'other' || s.includes('manual') || s === '' || s === 'null') {
+                        unclassifiedCount++;
+                    } else if (!approvedLower.includes(s.toLowerCase())) {
+                        questionSubjectMismatches++;
+                        if (!subjectMismatches.includes(s)) subjectMismatches.push(s);
+                    }
+                });
 
                 const gapReport = (sData || []).map(s => {
                     let topicName = s.topic;
@@ -191,6 +202,7 @@ export default async function handler(req: any, res: any) {
                 return res.status(200).json({ 
                     syllabusReport: gapReport, 
                     unclassifiedCount,
+                    questionSubjectMismatches,
                     subjectMismatches,
                     approvedSubjects: APPROVED_SUBJECTS
                 });

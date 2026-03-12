@@ -36,6 +36,7 @@ type AdminTab = 'automation' | 'qbank' | 'exams' | 'syllabus' | 'books' | 'users
 interface AuditReport {
     syllabusReport: { id: string; topic: string; count: number }[];
     unclassifiedCount: number;
+    questionSubjectMismatches?: number;
     subjectMismatches: string[];
     approvedSubjects: string[];
 }
@@ -259,15 +260,16 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     </div>
                                 </div>
 
-                                {auditReport?.subjectMismatches && auditReport.subjectMismatches.length > 0 && (
+                                 {auditReport?.subjectMismatches && auditReport.subjectMismatches.length > 0 && (
                                     <div className="bg-red-50 dark:bg-red-900/20 p-8 rounded-[2.5rem] border-2 border-red-100 dark:border-red-800 shadow-xl">
                                         <div className="flex items-center space-x-3 mb-4">
                                             <XMarkIcon className="h-6 w-6 text-red-600" />
                                             <h4 className="text-sm font-black uppercase tracking-tight text-red-700">Subject Naming Mismatches Detected</h4>
                                         </div>
                                         <p className="text-xs font-bold text-red-600/80 mb-4 uppercase tracking-widest">
-                                            The following subjects in your Syllabus do not match the App's "Approved Subjects" list. 
-                                            This will cause AI generation to fail or categorize questions incorrectly.
+                                            The following subjects in your Syllabus or Question Bank do not match the App's "Approved Subjects" list. 
+                                            {auditReport.questionSubjectMismatches ? ` Found ${auditReport.questionSubjectMismatches} questions with invalid subjects.` : ''}
+                                            Use the "Topic Repair" tool to fix these automatically.
                                         </p>
                                         <div className="flex flex-wrap gap-2">
                                             {auditReport.subjectMismatches.map(s => (
