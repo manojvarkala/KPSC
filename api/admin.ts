@@ -33,21 +33,24 @@ export default async function handler(req: any, res: any) {
     }
 
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
-    const { action, id, resultData, sheet, data, topic, setting, questions, rowData, feedback } = req.body;
+    const body = req.body || {};
+    const { action, id, resultData, sheet, data, topic, setting, questions, rowData, feedback } = body;
 
     if (action === 'save-result') {
         try {
-            const resultId = resultData.id || Date.now();
-            if (supabase) await upsertSupabaseData('results', [{ id: resultId, user_id: String(resultData.userId || 'guest'), user_email: String(resultData.userEmail || ''), test_title: String(resultData.testTitle || ''), score: resultData.score, total: resultData.total }]);
-            await appendSheetData('Results!A1', [[resultId, resultData.userId, resultData.userEmail, resultData.testTitle, resultData.score, resultData.total, new Date().toISOString()]]);
+            const rd = resultData || {};
+            const resultId = rd.id || Date.now();
+            if (supabase) await upsertSupabaseData('results', [{ id: resultId, user_id: String(rd.userId || 'guest'), user_email: String(rd.userEmail || ''), test_title: String(rd.testTitle || ''), score: rd.score || 0, total: rd.total || 0 }]);
+            await appendSheetData('Results!A1', [[resultId, rd.userId || 'guest', rd.userEmail || '', rd.testTitle || '', rd.score || 0, rd.total || 0, new Date().toISOString()]]);
             return res.status(200).json({ message: 'Saved' });
         } catch (e: any) { return res.status(500).json({ error: e.message }); }
     }
 
     if (action === 'submit-feedback') {
         try {
+            const fb = feedback || {};
             const feedbackId = Date.now();
-            await appendSheetData('Feedback!A1', [[feedbackId, feedback.userId || 'guest', feedback.userEmail || '', feedback.rating, feedback.comment, feedback.topic || '', new Date().toISOString()]]);
+            await appendSheetData('Feedback!A1', [[feedbackId, fb.userId || 'guest', fb.userEmail || '', fb.rating || 0, fb.comment || '', fb.topic || '', new Date().toISOString()]]);
             return res.status(200).json({ message: 'Feedback submitted' });
         } catch (e: any) { return res.status(500).json({ error: e.message }); }
     }
