@@ -145,24 +145,22 @@ export default async function handler(req: any, res: any) {
 
             case 'get-audit-report': {
                 if (!supabase) throw new Error("Supabase required.");
-                const { data: qData } = await supabase.from('questionbank').select('topic, subject');
+                // Increase limit to fetch all questions (up to 10k for audit)
+                const { data: qData } = await supabase.from('questionbank').select('topic, subject').limit(10000);
                 const { data: sData } = await supabase.from('syllabus').select('id, topic, title, subject');
                 
+                const totalQuestions = qData?.length || 0;
                 let unclassifiedCount = 0;
-                qData?.forEach(q => { 
-                    const s = String(q.subject || '').toLowerCase().trim();
-                    if (s === 'other' || s.includes('manual') || s === '' || s === 'null') unclassifiedCount++;
-                });
-
                 const approvedLower = APPROVED_SUBJECTS.map(s => s.toLowerCase().trim());
                 const subjectMismatches: string[] = [];
                 let questionSubjectMismatches = 0;
 
                 qData?.forEach(q => { 
                     const s = String(q.subject || '').trim();
-                    if (s === 'other' || s.includes('manual') || s === '' || s === 'null') {
+                    const sLower = s.toLowerCase();
+                    if (sLower === 'other' || sLower.includes('manual') || sLower === '' || sLower === 'null') {
                         unclassifiedCount++;
-                    } else if (!approvedLower.includes(s.toLowerCase())) {
+                    } else if (!approvedLower.includes(sLower)) {
                         questionSubjectMismatches++;
                         if (!subjectMismatches.includes(s)) subjectMismatches.push(s);
                     }
@@ -209,6 +207,7 @@ export default async function handler(req: any, res: any) {
 
                 return res.status(200).json({ 
                     syllabusReport: gapReport, 
+                    totalQuestions,
                     unclassifiedCount,
                     questionSubjectMismatches,
                     subjectMismatches,
