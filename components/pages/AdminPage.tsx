@@ -221,7 +221,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                 <ToolCard title="Push to Sheets" icon={CloudArrowUpIcon} action="sync-to-sheets" color="bg-orange-600" desc="Backup Supabase data back to Google Sheets (Emergency Use)." />
                                 <ToolCard title="PSC Daily Sync" icon={SparklesIcon} action="run-daily-sync" color="bg-indigo-600" desc="Full cycle sync: Jobs, Live Updates, CA, GK and Gap Filler." />
                                 <ToolCard title="Language Repair" icon={LanguageIcon} action="run-language-repair" color="bg-cyan-600" desc="Fixes questions that were accidentally translated to Malayalam instead of English." />
-                                <ToolCard title="Topic Repair" icon={TagIcon} action="run-topic-repair" color="bg-violet-600" desc="AI analysis to fill blank topics and subjects for questions." />
+                                <ToolCard title="Topic Repair" icon={TagIcon} action="run-topic-repair" color="bg-violet-600" desc={`AI analysis to fill blank topics and subjects. ${auditReport ? `(${(auditReport.questionSubjectMismatches || 0) + (auditReport.unclassifiedCount || 0)} pending)` : ''}`} />
                                 <ToolCard title="AI Explanations" icon={SparklesIcon} action="run-explanation-repair" color="bg-emerald-600" desc="AI generation of missing explanations for questions in the database." />
                                 <ToolCard title="Book Store Sync" icon={BookOpenIcon} action="run-book-scraper" color="bg-slate-800" desc="Updates bookstore with top Amazon PSC guides." />
                                 <ToolCard title="GK Fact Scraper" icon={LightBulbIcon} action="run-gk-scraper" color="bg-amber-500" desc="Generates unique study facts for the daily widget." />
@@ -231,7 +231,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
                         {activeTab === 'qbank' && (
                             <div className="space-y-8 animate-fade-in">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                     <div className="bg-orange-50 dark:bg-orange-900/20 p-8 rounded-[2.5rem] border-2 border-orange-100 dark:border-orange-800 shadow-xl flex flex-col justify-between">
                                         <div>
                                             <h4 className="text-[10px] font-black uppercase text-orange-600 tracking-widest mb-2">Sequential Audit</h4>
@@ -239,6 +239,15 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                             <p className="text-xs font-bold text-orange-500 mt-2">Batch processing by Serial Number (ID)</p>
                                         </div>
                                         <button onClick={() => handleAction('run-batch-qa')} className="mt-6 w-full bg-orange-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-orange-700 transition-all text-[10px] uppercase tracking-widest">Audit Next Batch</button>
+                                    </div>
+
+                                    <div className="bg-rose-50 dark:bg-rose-900/20 p-8 rounded-[2.5rem] border-2 border-rose-100 dark:border-rose-800 shadow-xl flex flex-col justify-between">
+                                        <div>
+                                            <h4 className="text-[10px] font-black uppercase text-rose-600 tracking-widest mb-2">Topic Repair</h4>
+                                            <p className="text-5xl font-black text-rose-700 dark:text-rose-300">{(auditReport?.unclassifiedCount || 0) + (auditReport?.questionSubjectMismatches || 0)}</p>
+                                            <p className="text-xs font-bold text-rose-500 mt-2">Questions needing Topic/Subject repair</p>
+                                        </div>
+                                        <button onClick={() => handleAction('run-topic-repair')} className="mt-6 w-full bg-rose-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-rose-700 transition-all text-[10px] uppercase tracking-widest">Repair Batch (20)</button>
                                     </div>
 
                                     <div className="bg-indigo-50 dark:bg-indigo-900/20 p-8 rounded-[2.5rem] border-2 border-indigo-100 dark:border-indigo-800 shadow-xl flex flex-col justify-between">
