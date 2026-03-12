@@ -227,6 +227,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                 <ToolCard title="Book Store Sync" icon={BookOpenIcon} action="run-book-scraper" color="bg-slate-800" desc="Updates bookstore with top Amazon PSC guides." />
                                 <ToolCard title="GK Fact Scraper" icon={LightBulbIcon} action="run-gk-scraper" color="bg-amber-500" desc="Generates unique study facts for the daily widget." />
                                 <ToolCard title="Flashcard Generator" icon={SparklesIcon} action="run-flashcard-generator" color="bg-rose-600" desc="AI generation of high-quality Malayalam flashcards with explanations." />
+                                <ToolCard title="Topic Normalization" icon={TagIcon} action="normalize-topics" color="bg-blue-600" desc="Maps non-syllabus topics to approved syllabus topics for better alignment." />
                             </div>
                         )}
 

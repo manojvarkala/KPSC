@@ -2,7 +2,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { findAndUpsertRow } from './sheets-service.js';
 import { supabase, upsertSupabaseData } from './supabase-service.js';
-import { APPROVED_SUBJECTS } from './scraper-service.js';
+import { APPROVED_SUBJECTS, APPROVED_TOPICS } from './scraper-service.js';
 
 declare var process: any;
 
@@ -52,7 +52,7 @@ export async function auditAndCorrectQuestions() {
             
             TASKS:
             1. RE-CLASSIFY: Assign the best matching subject from: [${APPROVED_SUBJECTS.join(', ')}]
-            2. TOPIC: Ensure the topic is accurate and specific.
+            2. TOPIC: Assign the best matching micro-topic from: [${APPROVED_TOPICS.join(', ')}]
             3. RE-WRITE: If the question contains phrases like "താഴെ പറയുന്നവയിൽ നിന്നും" (from the following), re-write it to be direct and clear without needing to see the options first.
             4. EXPLAIN: Ensure a high-quality Malayalam explanation is present.
             5. VALIDATE: Ensure options and correct_answer_index are accurate.

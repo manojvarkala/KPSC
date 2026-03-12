@@ -613,6 +613,94 @@ export async function syncSupabaseToSheets() {
     return { message: `Pushed ${totalUpdated} records from Supabase to Sheets.` };
 }
 
+const TOPICS_TO_REPLACE = [
+    "Active and Passive Voice", "Ancient Indian History", "Chemical Formulas", "Digestive System", "Districts of Kerala", 
+    "Electrical Engineering", "Formation of Kerala", "General Science / Science & Tech", "Human Respiratory System", 
+    "Indian Independence Movement", "Indus Valley Civilization", "Maurya Empire", "Modern Indian History", "Nouns", 
+    "Periodic Table", "Post-Independent India", "Renaissance Leaders", "Respiratory System", "Revolt of 1857", 
+    "Rivers and Lakes of Kerala", "Rivers of Kerala", "Singular and Plural Nouns", "Tense and Verbs", "Vaikom Satyagraha", 
+    "Welfare Schemes in Kerala", "Ancient Indian Literature", "Banking in India", "Battle of Buxar", "British Rule in Kerala", 
+    "Clocks", "Cognitive Development", "Communal Award", "Communication Skills", "Computer Hardware", "Computer Memory", 
+    "Delhi Sultanate", "Direction Sense Test", "Educational Reforms in British India", "Factors of Development", 
+    "Five Year Plans", "Gandhiji in Kerala", "Goods and Services Tax (GST)", "Governor Generals & Viceroys", 
+    "Growth and Development", "GST", "Gupta Empire", "History of Psychology", "Indian National Congress", 
+    "Indian National Movement", "Industrial Revolution", "Input Devices", "Intelligence Quotient", "Jnanpith Award", 
+    "Kerala Renaissance Leaders", "L.C.M", "Learning Theories", "Malayalam Literature", "Maratha Administration", 
+    "Mauryan Administration", "Medieval Indian History", "Memory and Forgetting", "Mughal Empire", "Muscular System", 
+    "NITI Aayog", "Output Devices", "Pazhassi Revolt", "Peasant Movements", "Post-Mauryan Period", "Press and Newspapers", 
+    "Principles of Development", "Reading Comprehension", "Reserve Bank of India", "Sandhi", "Satavahana Dynasty", 
+    "Schools of Psychology", "Scientific Discoveries", "Scientific Inventions", "Simon Commission", "Spelling and Word Usage", 
+    "Square and Square Root", "Stages of Development", "Tense", "Time and Distance", "Time and Work", "Travancore Kingdom", 
+    "Vaccines and Immunization", "Vigraharoopam", "Voice"
+];
+
+export async function normalizeTopics() {
+    if (!supabase) throw new Error("Supabase required.");
+    
+    // 1. Get approved topics from syllabus
+    const { data: sData } = await supabase.from('syllabus').select('topic, title, subject');
+    const approvedTopics = (sData || []).map(s => s.topic || s.title).filter(Boolean);
+    
+    // 2. Find questions with topics in the "to replace" list
+    const { data: toRepair } = await supabase
+        .from('questionbank')
+        .select('*')
+        .in('topic', TOPICS_TO_REPLACE)
+        .limit(50); // Process in batches
+        
+    if (!toRepair || toRepair.length === 0) return { message: "No questions found with topics needing replacement." };
+
+    try {
+        const ai = getAi();
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: `You are a Kerala PSC syllabus expert. Map these "Old Topics" to the most appropriate "Approved Syllabus Topics" from the provided list.
+            
+            Approved Syllabus Topics:
+            ${JSON.stringify(approvedTopics)}
+            
+            Approved Subjects:
+            ${JSON.stringify(APPROVED_SUBJECTS)}
+            
+            Questions to map:
+            ${JSON.stringify(toRepair.map(q => ({ id: q.id, question: q.question, oldTopic: q.topic, subject: q.subject })))}
+            
+            Rules:
+            1. If a direct match exists in Approved Topics, use it.
+            2. If no direct match, pick the most relevant micro-topic.
+            3. Ensure the Subject is also correct according to the new Topic.
+            
+            Return JSON array: [{ "id": number, "topic": "string", "subject": "string" }]`,
+            config: { responseMimeType: "application/json" }
+        });
+        
+        const updates = JSON.parse(response.text || "[]");
+        if (updates.length > 0) {
+            const finalData = toRepair.map(q => {
+                const update = updates.find((u: any) => u.id == q.id);
+                if (!update) return q;
+                return { 
+                    ...q, 
+                    topic: update.topic,
+                    subject: update.subject
+                };
+            });
+            
+            await upsertSupabaseData('questionbank', finalData);
+            const sheetRows = finalData.map(q => ({
+                id: String(q.id),
+                data: [q.id, q.topic, q.question, JSON.stringify(q.options), q.correct_answer_index, q.subject, q.difficulty, q.explanation]
+            }));
+            await batchUpsertRows('QuestionBank', sheetRows);
+            return { message: `Successfully normalized ${finalData.length} questions to approved syllabus topics.` };
+        }
+    } catch (e: any) {
+        console.error("Normalize Topics Error:", e.message);
+        throw e;
+    }
+    return { message: "Normalization batch failed." };
+}
+
 export async function syncAllFromSheetsToSupabase() {
     if (!supabase) throw new Error("No Supabase.");
     const tables = [

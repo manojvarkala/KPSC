@@ -16,6 +16,7 @@ import {
     repairBlankTopics,
     backfillExplanations,
     bulkUploadQuestions,
+    normalizeTopics,
     APPROVED_SUBJECTS
 } from "./_lib/scraper-service.js";
 import { auditAndCorrectQuestions } from "./_lib/audit-service.js";
@@ -87,6 +88,7 @@ export default async function handler(req: any, res: any) {
             case 'run-language-repair': return res.status(200).json(await repairLanguageMismatches());
             case 'run-topic-repair': return res.status(200).json(await repairBlankTopics());
             case 'run-explanation-repair': return res.status(200).json(await backfillExplanations());
+            case 'normalize-topics': return res.status(200).json(await normalizeTopics());
             case 'upload-questions': return res.status(200).json(await bulkUploadQuestions(questions));
             
             case 'save-row': {
