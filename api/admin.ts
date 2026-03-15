@@ -23,11 +23,17 @@ import { auditAndCorrectQuestions } from "./_lib/audit-service.js";
 import { supabase, upsertSupabaseData, deleteSupabaseRow } from "./_lib/supabase-service.js";
 
 async function getRequestBody(req: any) {
-    if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) return req.body;
-    if (typeof req.body === 'string' && req.body.length > 0) {
-        try { return JSON.parse(req.body); } catch (e) { return {}; }
+    // If body is already an object, return it (standard for many serverless platforms)
+    if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+        return req.body;
     }
     
+    // If body is a string, try to parse it
+    if (typeof req.body === 'string' && req.body.length > 0) {
+        try { return JSON.parse(req.body); } catch (e) { /* ignore */ }
+    }
+    
+    // Fallback: Read from stream (for platforms that don't pre-parse)
     return new Promise((resolve) => {
         let body = '';
         req.on('data', (chunk: any) => { body += chunk.toString(); });
@@ -38,12 +44,50 @@ async function getRequestBody(req: any) {
                 resolve({});
             }
         });
-        setTimeout(() => resolve({}), 2000); // Timeout guard
+        // Short timeout for stream reading
+        setTimeout(() => resolve({}), 1000);
     });
+}
+
+async function handleTestConnection(res: any) {
+    console.log("Testing connection...");
+    let sheetsStatus: any = { ok: false, error: null };
+    let supabaseStatus: any = { ok: false, error: null };
+    
+    try { 
+        const data = await readSheetData('Exams!A1:A1'); 
+        console.log("Sheets connection OK, data length:", data.length);
+        sheetsStatus.ok = true; 
+    } catch (e: any) { 
+        console.error("Sheets connection FAILED:", e.message);
+        sheetsStatus.error = e.message || "Failed to access spreadsheet";
+    }
+
+    if (supabase) {
+        try { 
+            const { error } = await supabase.from('exams').select('id').limit(1); 
+            if (error) throw error;
+            console.log("Supabase connection OK");
+            supabaseStatus.ok = true; 
+        } catch (e: any) { 
+            console.error("Supabase connection FAILED:", e.message);
+            supabaseStatus.error = e.message || "Failed to query Supabase table";
+        }
+    } else {
+        console.warn("Supabase client is NULL");
+        supabaseStatus.error = "SUPABASE_URL or KEY is missing from server env";
+    }
+
+    return res.status(200).json({ status: { sheets: sheetsStatus.ok, supabase: supabaseStatus.ok, sheetsErr: sheetsStatus.error, supabaseErr: supabaseStatus.error } });
 }
 
 export default async function handler(req: any, res: any) {
     if (req.method === 'GET') {
+        const { action } = req.query;
+        if (action === 'test-connection') {
+            return await handleTestConnection(res);
+        }
+        
         const authHeader = req.headers.authorization;
         if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) return res.status(401).json({ error: 'Unauthorized' });
         try {
@@ -55,7 +99,9 @@ export default async function handler(req: any, res: any) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
     
     const body: any = await getRequestBody(req);
-    const { action, id, resultData, sheet, data, topic, setting, questions, rowData, feedback } = body || {};
+    // Support action from both body and query for maximum resilience
+    const action = body?.action || req.query?.action;
+    const { id, resultData, sheet, data, topic, setting, questions, rowData, feedback } = body || {};
 
     if (action === 'save-result') {
         try {
@@ -77,35 +123,7 @@ export default async function handler(req: any, res: any) {
     }
 
     if (action === 'test-connection') {
-        console.log("Testing connection...");
-        let sheetsStatus: any = { ok: false, error: null };
-        let supabaseStatus: any = { ok: false, error: null };
-        
-        try { 
-            const data = await readSheetData('Exams!A1:A1'); 
-            console.log("Sheets connection OK, data length:", data.length);
-            sheetsStatus.ok = true; 
-        } catch (e: any) { 
-            console.error("Sheets connection FAILED:", e.message);
-            sheetsStatus.error = e.message || "Failed to access spreadsheet";
-        }
-
-        if (supabase) {
-            try { 
-                const { error } = await supabase.from('exams').select('id').limit(1); 
-                if (error) throw error;
-                console.log("Supabase connection OK");
-                supabaseStatus.ok = true; 
-            } catch (e: any) { 
-                console.error("Supabase connection FAILED:", e.message);
-                supabaseStatus.error = e.message || "Failed to query Supabase table";
-            }
-        } else {
-            console.warn("Supabase client is NULL");
-            supabaseStatus.error = "SUPABASE_URL or KEY is missing from server env";
-        }
-
-        return res.status(200).json({ status: { sheets: sheetsStatus.ok, supabase: supabaseStatus.ok, sheetsErr: sheetsStatus.error, supabaseErr: supabaseStatus.error } });
+        return await handleTestConnection(res);
     }
 
     try { await verifyAdmin(req); } catch (e: any) { return res.status(401).json({ error: e.message }); }

@@ -161,11 +161,21 @@ export const saveTestResult = (resultData: any) => fetch('/api/admin', {
 
 export const testConnection = async (token: string | null) => {
     try {
-        const res = await fetch('/api/admin', {
+        // Try POST first
+        let res = await fetch('/api/admin?action=test-connection', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify({ action: 'test-connection' })
         });
+        
+        // If POST fails, try GET as a fallback (more resilient to body parsing issues)
+        if (!res.ok) {
+            res = await fetch('/api/admin?action=test-connection', {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+        }
+
         if (!res.ok) {
             const errorText = await res.text();
             return { status: { sheets: false, supabase: false, sheetsErr: errorText, supabaseErr: errorText } };
