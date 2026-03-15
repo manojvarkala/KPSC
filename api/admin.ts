@@ -33,8 +33,17 @@ export default async function handler(req: any, res: any) {
     }
 
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
-    const body = req.body || {};
-    const { action, id, resultData, sheet, data, topic, setting, questions, rowData, feedback } = body;
+    
+    let body = req.body;
+    if (typeof body === 'string') {
+        try {
+            body = JSON.parse(body);
+        } catch (e) {
+            console.error("Failed to parse request body:", e);
+        }
+    }
+    
+    const { action, id, resultData, sheet, data, topic, setting, questions, rowData, feedback } = body || {};
 
     if (action === 'save-result') {
         try {

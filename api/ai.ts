@@ -11,7 +11,16 @@ export default async function handler(req: any, res: any) {
         return res.status(500).json({ error: 'AI API Key is not configured on the server.' });
     }
 
-    const { prompt, model = 'gemini-3-flash-preview', responseSchema, useSearch = false } = req.body;
+    let body = req.body;
+    if (typeof body === 'string') {
+        try {
+            body = JSON.parse(body);
+        } catch (e) {
+            console.error("Failed to parse request body:", e);
+        }
+    }
+
+    const { prompt, model = 'gemini-3-flash-preview', responseSchema, useSearch = false } = body || {};
 
     if (!prompt) {
         return res.status(400).json({ error: 'Prompt is required' });

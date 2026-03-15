@@ -6,7 +6,16 @@ import { GoogleGenAI } from "@google/genai";
 export default async function handler(req: any, res: any) {
     if (req.method !== 'POST') return res.status(405).json({ message: 'Method Not Allowed' });
 
-    const { topic, forceRefresh } = req.body;
+    let body = req.body;
+    if (typeof body === 'string') {
+        try {
+            body = JSON.parse(body);
+        } catch (e) {
+            console.error("Failed to parse request body:", e);
+        }
+    }
+
+    const { topic, forceRefresh } = body || {};
     if (!topic) return res.status(400).json({ error: 'Topic is required' });
 
     try {

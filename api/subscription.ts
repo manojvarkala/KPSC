@@ -3,7 +3,18 @@ import { supabase, upsertSupabaseData } from './_lib/supabase-service.js';
 import { readSheetData, findAndUpsertRow } from './_lib/sheets-service.js';
 
 export default async function handler(req: any, res: any) {
-    const { userId, action, planType } = req.body;
+    if (req.method !== 'POST') return res.status(405).json({ message: 'Method Not Allowed' });
+
+    let body = req.body;
+    if (typeof body === 'string') {
+        try {
+            body = JSON.parse(body);
+        } catch (e) {
+            console.error("Failed to parse request body:", e);
+        }
+    }
+
+    const { userId, action, planType } = body || {};
 
     if (!userId) return res.status(400).json({ error: 'User ID is required' });
 

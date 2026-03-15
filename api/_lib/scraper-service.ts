@@ -73,6 +73,8 @@ export const SYLLABUS_STRUCTURE = {
   ]
 };
 
+export const APPROVED_TOPICS = Object.values(SYLLABUS_STRUCTURE).flat();
+
 /**
  * BULK UPLOAD LOGIC: Handles manual entries
  */
