@@ -213,19 +213,43 @@ export default async function handler(req: any, res: any) {
                 const { data: sData } = await supabase.from('syllabus').select('id, topic, title, subject');
                 
                 const totalQuestions = realTotalCount || qData?.length || 0;
+                
+                // 3. Prepare syllabus topic list for matching
+                const syllabusTopicsLower = (sData || []).map(s => {
+                    let name = s.topic;
+                    if (!name || String(name).toLowerCase() === 'null' || String(name).trim() === '') name = s.title;
+                    return String(name || '').toLowerCase().trim();
+                }).filter(Boolean);
+
                 let unclassifiedCount = 0;
                 const approvedLower = APPROVED_SUBJECTS.map(s => s.toLowerCase().trim());
                 const subjectMismatches: string[] = [];
+                const unapprovedTopics: string[] = [];
                 let questionSubjectMismatches = 0;
 
                 qData?.forEach(q => { 
                     const s = String(q.subject || '').trim();
                     const sLower = s.toLowerCase();
-                    if (sLower === 'other' || sLower.includes('manual') || sLower === '' || sLower === 'null') {
+                    const t = String(q.topic || '').trim();
+                    const tLower = t.toLowerCase();
+
+                    // Check if subject is invalid
+                    const isInvalidSubject = sLower === 'other' || sLower.includes('manual') || sLower === '' || sLower === 'null' || !approvedLower.includes(sLower);
+                    
+                    // Check if topic is invalid (empty or not in syllabus)
+                    const isInvalidTopic = tLower === '' || tLower === 'null' || !syllabusTopicsLower.includes(tLower);
+
+                    if (isInvalidSubject || isInvalidTopic) {
                         unclassifiedCount++;
-                    } else if (!approvedLower.includes(sLower)) {
-                        questionSubjectMismatches++;
-                        if (!subjectMismatches.includes(s)) subjectMismatches.push(s);
+                        
+                        if (sLower !== '' && sLower !== 'null' && !approvedLower.includes(sLower)) {
+                            questionSubjectMismatches++;
+                            if (!subjectMismatches.includes(s)) subjectMismatches.push(s);
+                        }
+
+                        if (tLower !== '' && tLower !== 'null' && !syllabusTopicsLower.includes(tLower)) {
+                            if (!unapprovedTopics.includes(t)) unapprovedTopics.push(t);
+                        }
                     }
                 });
 
@@ -274,6 +298,7 @@ export default async function handler(req: any, res: any) {
                     unclassifiedCount,
                     questionSubjectMismatches,
                     subjectMismatches,
+                    unapprovedTopics,
                     approvedSubjects: APPROVED_SUBJECTS
                 });
             }

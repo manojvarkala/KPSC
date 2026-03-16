@@ -18,6 +18,7 @@ import { AcademicCapIcon } from '../icons/AcademicCapIcon';
 import { ClipboardListIcon } from '../icons/ClipboardListIcon';
 import { PlusIcon } from '../icons/PlusIcon';
 import { XMarkIcon } from '../icons/XMarkIcon';
+import { ExclamationTriangleIcon } from '../icons/ExclamationTriangleIcon';
 import { ArrowPathIcon } from '../icons/ArrowPathIcon';
 import { CheckCircleIcon } from '../icons/CheckCircleIcon';
 import { SparklesIcon } from '../icons/SparklesIcon';
@@ -64,6 +65,11 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const totalGaps = useMemo(() => auditReport?.syllabusReport.filter(r => r.count === 0).length || 0, [auditReport]);
     const totalClassified = useMemo(() => auditReport?.syllabusReport.reduce((acc, curr) => acc + curr.count, 0) || 0, [auditReport]);
     const totalQuestions = useMemo(() => auditReport?.totalQuestions || 0, [auditReport]);
+    const totalUnclassified = useMemo(() => {
+        if (!auditReport) return 0;
+        // Unclassified is Total - Classified
+        return Math.max(0, totalQuestions - totalClassified);
+    }, [totalQuestions, totalClassified, auditReport]);
 
     const isAdmin = useMemo(() => user?.publicMetadata?.role === 'admin', [user]);
 
@@ -280,10 +286,30 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                         </div>
                                         <div className="mt-6 flex items-center justify-between bg-blue-100 dark:bg-blue-800/50 rounded-2xl p-4">
                                             <span className="text-[9px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-300">Classified: {totalClassified}</span>
-                                            <span className="text-[9px] font-black uppercase tracking-widest text-blue-400">Unclassified: {auditReport?.unclassifiedCount || 0}</span>
+                                            <span className="text-[9px] font-black uppercase tracking-widest text-blue-400">Unclassified: {totalUnclassified}</span>
                                         </div>
                                     </div>
                                 </div>
+
+                                 {auditReport?.unapprovedTopics && auditReport.unapprovedTopics.length > 0 && (
+                                    <div className="bg-orange-50 dark:bg-orange-900/20 p-8 rounded-[2.5rem] border-2 border-orange-100 dark:border-orange-800 shadow-xl mb-8">
+                                        <div className="flex items-center space-x-3 mb-4">
+                                            <ExclamationTriangleIcon className="h-6 w-6 text-orange-600" />
+                                            <h4 className="text-sm font-black uppercase tracking-tight text-orange-700">Unapproved Topics Detected</h4>
+                                        </div>
+                                        <p className="text-xs font-bold text-orange-600/80 mb-4 uppercase tracking-widest">
+                                            The following topics in your Question Bank do not match any micro-topic in your Syllabus. 
+                                            Use the "Topic Normalization" tool to map these to approved syllabus topics.
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {auditReport.unapprovedTopics.map(t => (
+                                                <span key={t} className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-[9px] font-black uppercase border border-orange-200">
+                                                    {t}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                  {auditReport?.subjectMismatches && auditReport.subjectMismatches.length > 0 && (
                                     <div className="bg-red-50 dark:bg-red-900/20 p-8 rounded-[2.5rem] border-2 border-red-100 dark:border-red-800 shadow-xl">
