@@ -40,6 +40,8 @@ interface AuditReport {
     unclassifiedCount: number;
     questionSubjectMismatches?: number;
     subjectMismatches: string[];
+    unapprovedTopics?: string[];
+    lastAuditedId?: number;
     approvedSubjects: string[];
 }
 
@@ -245,8 +247,8 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     <div className="bg-orange-50 dark:bg-orange-900/20 p-8 rounded-[2.5rem] border-2 border-orange-100 dark:border-orange-800 shadow-xl flex flex-col justify-between">
                                         <div>
                                             <h4 className="text-[10px] font-black uppercase text-orange-600 tracking-widest mb-2">Sequential Audit</h4>
-                                            <p className="text-5xl font-black text-orange-700 dark:text-orange-300">{auditReport?.unclassifiedCount || 0}</p>
-                                            <p className="text-xs font-bold text-orange-500 mt-2">Batch processing by Serial Number (ID)</p>
+                                            <p className="text-5xl font-black text-orange-700 dark:text-orange-300">{auditReport?.lastAuditedId || 0}</p>
+                                            <p className="text-xs font-bold text-orange-500 mt-2">Current Serial Number (ID) processed</p>
                                         </div>
                                         <button onClick={() => handleAction('run-batch-qa')} className="mt-6 w-full bg-orange-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-orange-700 transition-all text-[10px] uppercase tracking-widest">Audit Next Batch</button>
                                     </div>

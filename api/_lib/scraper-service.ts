@@ -567,12 +567,31 @@ export async function repairBlankTopics() {
         
         const updates = JSON.parse(response.text || "[]");
         if (updates.length > 0) {
+            const approvedLower = approvedTopics.map(t => String(t).toLowerCase().trim());
             const finalData = toRepair.map(q => {
                 const update = updates.find((u: any) => u.id == q.id);
+                if (!update) return q;
+                
+                // Strict mapping: Ensure topic is from the approved list
+                let matchedTopic = update.topic;
+                const updateTopicLower = String(update.topic || '').toLowerCase().trim();
+                const matchIndex = approvedLower.indexOf(updateTopicLower);
+                
+                if (matchIndex !== -1) {
+                    matchedTopic = approvedTopics[matchIndex]; // Use exact casing from syllabus
+                } else {
+                    // Try partial match if no exact match
+                    const partialMatch = approvedTopics.find(t => 
+                        t.toLowerCase().includes(updateTopicLower) || 
+                        updateTopicLower.includes(t.toLowerCase())
+                    );
+                    matchedTopic = partialMatch || q.topic || 'General';
+                }
+
                 return { 
                     ...q, 
-                    topic: update?.topic || q.topic || 'General',
-                    subject: update?.subject || q.subject || 'General Knowledge'
+                    topic: matchedTopic,
+                    subject: APPROVED_SUBJECTS.includes(update.subject) ? update.subject : (q.subject || 'General Knowledge')
                 };
             });
             
@@ -688,13 +707,31 @@ async function processNormalizationBatch(toRepair: any[], approvedTopics: string
         
         const updates = JSON.parse(response.text || "[]");
         if (updates.length > 0) {
+            const approvedLower = approvedTopics.map(t => String(t).toLowerCase().trim());
             const finalData = toRepair.map(q => {
                 const update = updates.find((u: any) => u.id == q.id);
                 if (!update) return q;
+
+                // Strict mapping: Ensure topic is from the approved list
+                let matchedTopic = update.topic;
+                const updateTopicLower = String(update.topic || '').toLowerCase().trim();
+                const matchIndex = approvedLower.indexOf(updateTopicLower);
+                
+                if (matchIndex !== -1) {
+                    matchedTopic = approvedTopics[matchIndex]; // Use exact casing from syllabus
+                } else {
+                    // Try partial match if no exact match
+                    const partialMatch = approvedTopics.find(t => 
+                        t.toLowerCase().includes(updateTopicLower) || 
+                        updateTopicLower.includes(t.toLowerCase())
+                    );
+                    matchedTopic = partialMatch || q.topic || 'General';
+                }
+
                 return { 
                     ...q, 
-                    topic: update.topic,
-                    subject: update.subject
+                    topic: matchedTopic,
+                    subject: APPROVED_SUBJECTS.includes(update.subject) ? update.subject : (q.subject || 'General Knowledge')
                 };
             });
             

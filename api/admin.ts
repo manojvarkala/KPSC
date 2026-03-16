@@ -214,7 +214,11 @@ export default async function handler(req: any, res: any) {
                 
                 const totalQuestions = realTotalCount || qData?.length || 0;
                 
-                // 3. Prepare syllabus topic list for matching
+                // 3. Fetch last audited ID
+                const { data: lastAuditedSetting } = await supabase.from('settings').select('value').eq('key', 'last_audited_id').single();
+                const lastAuditedId = parseInt(lastAuditedSetting?.value || '0');
+
+                // 4. Prepare syllabus topic list for matching
                 const syllabusTopicsLower = (sData || []).map(s => {
                     let name = s.topic;
                     if (!name || String(name).toLowerCase() === 'null' || String(name).trim() === '') name = s.title;
@@ -299,6 +303,7 @@ export default async function handler(req: any, res: any) {
                     questionSubjectMismatches,
                     subjectMismatches,
                     unapprovedTopics,
+                    lastAuditedId,
                     approvedSubjects: APPROVED_SUBJECTS
                 });
             }
