@@ -202,11 +202,17 @@ export default async function handler(req: any, res: any) {
 
             case 'get-audit-report': {
                 if (!supabase) throw new Error("Supabase required.");
-                // Increase limit to fetch all questions (up to 10k for audit)
+                
+                // 1. Get the actual total count (not limited by fetch size)
+                const { count: realTotalCount } = await supabase
+                    .from('questionbank')
+                    .select('*', { count: 'exact', head: true });
+
+                // 2. Fetch data for classification audit (limited to 10k for performance)
                 const { data: qData } = await supabase.from('questionbank').select('topic, subject').limit(10000);
                 const { data: sData } = await supabase.from('syllabus').select('id, topic, title, subject');
                 
-                const totalQuestions = qData?.length || 0;
+                const totalQuestions = realTotalCount || qData?.length || 0;
                 let unclassifiedCount = 0;
                 const approvedLower = APPROVED_SUBJECTS.map(s => s.toLowerCase().trim());
                 const subjectMismatches: string[] = [];
