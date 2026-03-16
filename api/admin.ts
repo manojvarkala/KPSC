@@ -257,7 +257,10 @@ export default async function handler(req: any, res: any) {
                     }
                 });
 
-                const gapReport = (sData || []).map(s => {
+                const uniqueTopics = new Set<string>();
+                const gapReport: any[] = [];
+                
+                (sData || []).forEach(s => {
                     // Prioritize 'topic' field as it's the "Syllabus Topic" in the sheet
                     let topicName = s.topic;
                     if (!topicName || String(topicName).toLowerCase() === 'null' || String(topicName).trim() === '') {
@@ -268,6 +271,9 @@ export default async function handler(req: any, res: any) {
                     }
                     
                     const sTopic = String(topicName).toLowerCase().trim();
+                    if (uniqueTopics.has(sTopic)) return; // Skip duplicates
+                    uniqueTopics.add(sTopic);
+
                     const sSubject = String(s.subject || '').toLowerCase().trim();
 
                     if (s.subject && !approvedLower.includes(s.subject.toLowerCase().trim())) {
@@ -293,7 +299,7 @@ export default async function handler(req: any, res: any) {
                         return false;
                     }).length || 0;
 
-                    return { id: s.id, topic: topicName, count, subject: s.subject };
+                    gapReport.push({ id: s.id, topic: topicName, count, subject: s.subject });
                 });
 
                 return res.status(200).json({ 

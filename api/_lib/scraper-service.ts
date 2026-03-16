@@ -498,48 +498,31 @@ export async function repairLanguageMismatches() {
 export async function repairBlankTopics() {
     if (!supabase) throw new Error("Supabase required.");
     
-    // 1. Try to find questions with blank topics or subjects first (highest priority)
-    const { data: blanks, error: blankErr } = await supabase
-        .from('questionbank')
-        .select('*')
-        .or('topic.is.null,topic.eq."",subject.is.null,subject.eq.""')
-        .limit(50);
-        
-    if (blankErr) throw blankErr;
+    // Fetch all question IDs, topics, and subjects to find the unmapped ones
+    // This avoids PostgREST URL length limits and syntax errors with large IN clauses
+    const { data: allQ, error: fetchErr } = await supabase.from('questionbank').select('id, topic, subject');
+    if (fetchErr) throw fetchErr;
+
+    const approvedSubjectsLower = APPROVED_SUBJECTS.map(s => String(s).toLowerCase().trim());
     
-    let toRepair = blanks || [];
-    
-    // 2. If no blanks, look for subjects not in the approved list
-    if (toRepair.length < 50) {
-        const approvedListString = `(${APPROVED_SUBJECTS.map(s => `"${s}"`).join(',')})`;
-        const { data: invalid, error: invErr } = await supabase
-            .from('questionbank')
-            .select('*')
-            .not('subject', 'in', approvedListString)
-            .limit(50 - toRepair.length);
-            
-        if (invErr) {
-            console.warn("Invalid subject query failed (likely due to special characters), falling back to batch check.");
-        } else if (invalid && invalid.length > 0) {
-            toRepair = [...toRepair, ...invalid];
-        }
+    const unmappedIds = (allQ || []).filter(q => {
+        const t = String(q.topic || '').toLowerCase().trim();
+        const s = String(q.subject || '').toLowerCase().trim();
+        return t === '' || t === 'null' || s === '' || s === 'null' || !approvedSubjectsLower.includes(s);
+    }).map(q => q.id).slice(0, 50); // Get up to 50 IDs to repair
+
+    if (unmappedIds.length === 0) {
+        return { message: "No questions needing repair found." };
     }
 
-    // 3. Fallback: If still nothing found via targeted queries, check a random batch
-    if (toRepair.length === 0) {
-        const { data: batch } = await supabase
-            .from('questionbank')
-            .select('*')
-            .limit(500);
-            
-        toRepair = (batch || []).filter(q => 
-            !q.topic || q.topic.trim() === "" || 
-            !q.subject || q.subject.trim() === "" || 
-            !APPROVED_SUBJECTS.includes(q.subject)
-        ).slice(0, 50);
-    }
-        
-    if (toRepair.length === 0) return { message: "No questions needing repair found." };
+    // Fetch the full data for the questions to repair
+    const { data: toRepair, error: repairErr } = await supabase
+        .from('questionbank')
+        .select('*')
+        .in('id', unmappedIds);
+
+    if (repairErr) throw repairErr;
+    if (!toRepair || toRepair.length === 0) return { message: "Could not fetch questions to repair." };
 
     try {
         // Get approved topics from syllabus for strict mapping
@@ -650,32 +633,30 @@ export async function normalizeTopics() {
     
     if (approvedTopics.length === 0) throw new Error("No syllabus topics found to normalize against.");
 
-    // 2. Find questions with topics NOT in the approved list
-    // Using a direct query with .not('topic', 'in', [...]) is much faster than fetching all topics
-    // We also handle null/empty topics just in case
-    const approvedListString = `(${approvedTopics.map(t => `"${t.replace(/"/g, '""')}"`).join(',')})`;
+    // 2. Fetch all question IDs and topics to find the unmapped ones
+    // This avoids PostgREST URL length limits and syntax errors with large IN clauses
+    const { data: allQ, error: fetchErr } = await supabase.from('questionbank').select('id, topic');
+    if (fetchErr) throw fetchErr;
+
+    const approvedLower = approvedTopics.map(t => String(t).toLowerCase().trim());
     
-    const { data: toRepair, error } = await supabase
-        .from('questionbank')
-        .select('*')
-        .or(`topic.is.null,topic.eq."",topic.not.in.${approvedListString}`)
-        .limit(50);
-        
-    if (error) {
-        console.error("Normalization Query Error:", error);
-        // Fallback: If the complex OR query fails, try a simpler batch check
-        const { data: batch } = await supabase.from('questionbank').select('*').limit(500);
-        const approvedLower = approvedTopics.map(t => String(t).toLowerCase().trim());
-        const filtered = (batch || []).filter(q => {
-            const t = String(q.topic || '').toLowerCase().trim();
-            return t === '' || !approvedLower.includes(t);
-        }).slice(0, 50);
-        
-        if (filtered.length === 0) return { message: "No questions found needing normalization in the current batch." };
-        return await processNormalizationBatch(filtered, approvedTopics);
+    const unmappedIds = (allQ || []).filter(q => {
+        const t = String(q.topic || '').toLowerCase().trim();
+        return t === '' || t === 'null' || !approvedLower.includes(t);
+    }).map(q => q.id).slice(0, 50); // Get up to 50 IDs to repair
+
+    if (unmappedIds.length === 0) {
+        return { message: "All questions are already mapped to approved syllabus topics." };
     }
 
-    if (!toRepair || toRepair.length === 0) return { message: "All questions are already mapped to approved syllabus topics." };
+    // 3. Fetch the full data for the questions to repair
+    const { data: toRepair, error: repairErr } = await supabase
+        .from('questionbank')
+        .select('*')
+        .in('id', unmappedIds);
+
+    if (repairErr) throw repairErr;
+    if (!toRepair || toRepair.length === 0) return { message: "Could not fetch questions to repair." };
 
     return await processNormalizationBatch(toRepair, approvedTopics);
 }
