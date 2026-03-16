@@ -499,7 +499,7 @@ export async function repairBlankTopics() {
     if (!supabase) throw new Error("Supabase required.");
     
     // Read TODO list from settings
-    const { data: todoSetting } = await supabase.from('settings').select('value').eq('id', 'repair_todo_ids').single();
+    const { data: todoSetting } = await supabase.from('settings').select('value').eq('key', 'repair_todo_ids').single();
     let unmappedIds: number[] = [];
     if (todoSetting && todoSetting.value) {
         try { unmappedIds = JSON.parse(todoSetting.value); } catch (e) {}
@@ -520,7 +520,7 @@ export async function repairBlankTopics() {
     if (repairErr) throw repairErr;
     if (!toRepair || toRepair.length === 0) {
         const remainingIds = unmappedIds.filter(id => !batchIds.includes(id));
-        await upsertSupabaseData('settings', [{ id: 'repair_todo_ids', value: JSON.stringify(remainingIds) }]);
+        await upsertSupabaseData('settings', [{ key: 'repair_todo_ids', value: JSON.stringify(remainingIds) }], 'key');
         return { message: "Could not fetch questions to repair. Cleaned up stale IDs." };
     }
 
@@ -587,7 +587,7 @@ export async function repairBlankTopics() {
             
             // Update TODO list
             const remainingIds = unmappedIds.filter(id => !batchIds.includes(id));
-            await upsertSupabaseData('settings', [{ id: 'repair_todo_ids', value: JSON.stringify(remainingIds) }]);
+            await upsertSupabaseData('settings', [{ key: 'repair_todo_ids', value: JSON.stringify(remainingIds) }], 'key');
             
             return { message: `Successfully repaired ${finalData.length} questions (Fixed blanks or unapproved subjects).` };
         }
@@ -639,7 +639,7 @@ export async function normalizeTopics() {
     if (approvedTopics.length === 0) throw new Error("No syllabus topics found to normalize against.");
 
     // 2. Read TODO list from settings
-    const { data: todoSetting } = await supabase.from('settings').select('value').eq('id', 'normalization_todo_ids').single();
+    const { data: todoSetting } = await supabase.from('settings').select('value').eq('key', 'normalization_todo_ids').single();
     let unmappedIds: number[] = [];
     if (todoSetting && todoSetting.value) {
         try { unmappedIds = JSON.parse(todoSetting.value); } catch (e) {}
@@ -662,7 +662,7 @@ export async function normalizeTopics() {
     if (!toRepair || toRepair.length === 0) {
         // If we couldn't fetch them, maybe they were deleted. Remove from TODO and return.
         const remainingIds = unmappedIds.filter(id => !batchIds.includes(id));
-        await upsertSupabaseData('settings', [{ id: 'normalization_todo_ids', value: JSON.stringify(remainingIds) }]);
+        await upsertSupabaseData('settings', [{ key: 'normalization_todo_ids', value: JSON.stringify(remainingIds) }], 'key');
         return { message: "Could not fetch questions to repair. Cleaned up stale IDs." };
     }
 
@@ -670,7 +670,7 @@ export async function normalizeTopics() {
 
     // 4. Update TODO list
     const remainingIds = unmappedIds.filter(id => !batchIds.includes(id));
-    await upsertSupabaseData('settings', [{ id: 'normalization_todo_ids', value: JSON.stringify(remainingIds) }]);
+    await upsertSupabaseData('settings', [{ key: 'normalization_todo_ids', value: JSON.stringify(remainingIds) }], 'key');
 
     return result;
 }

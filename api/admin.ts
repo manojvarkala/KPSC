@@ -215,7 +215,7 @@ export default async function handler(req: any, res: any) {
                 const totalQuestions = realTotalCount || qData?.length || 0;
                 
                 // 3. Fetch last audited ID
-                const { data: lastAuditedSetting } = await supabase.from('settings').select('value').eq('id', 'last_audited_id').single();
+                const { data: lastAuditedSetting } = await supabase.from('settings').select('value').eq('key', 'last_audited_id').single();
                 const lastAuditedId = parseInt(lastAuditedSetting?.value || '0');
 
                 // 4. Prepare syllabus topic list for matching
@@ -270,9 +270,9 @@ export default async function handler(req: any, res: any) {
 
                 // Save TODO lists to settings
                 await upsertSupabaseData('settings', [
-                    { id: 'normalization_todo_ids', value: JSON.stringify(normalizationTodoIds) },
-                    { id: 'repair_todo_ids', value: JSON.stringify(repairTodoIds) }
-                ]);
+                    { key: 'normalization_todo_ids', value: JSON.stringify(normalizationTodoIds) },
+                    { key: 'repair_todo_ids', value: JSON.stringify(repairTodoIds) }
+                ], 'key');
 
                 const uniqueTopics = new Set<string>();
                 const gapReport: any[] = [];
