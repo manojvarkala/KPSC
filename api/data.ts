@@ -138,15 +138,23 @@ export default async function handler(req: any, res: any) {
         if (supabase) {
             let query = supabase.from(tableName).select('*');
             if (tableName === 'syllabus' && examId) query = query.eq('exam_id', String(examId));
+            let fetchLimit = limitCount;
             if (tableName === 'questionbank') {
                 if (topic && topic !== 'mixed') {
-                    query = query.ilike('topic', `%${topic}%`);
+                    const words = topic.split(/[\s,.-]+/).filter((w: string) => w.length > 2);
+                    if (words.length > 0) {
+                        const ilikeConditions = words.map((w: string) => `topic.ilike.%${w}%,subject.ilike.%${w}%`).join(',');
+                        query = query.or(ilikeConditions);
+                    } else {
+                        query = query.or(`topic.ilike.%${topic}%,subject.ilike.%${topic}%`);
+                    }
+                    fetchLimit = 200; // Fetch more to sort by relevance
                 } else if (subject && subject !== 'mixed' && subject !== 'General') {
                     query = query.ilike('subject', `%${subject}%`);
                 }
             }
             
-            query = query.range(offsetCount, offsetCount + limitCount - 1);
+            query = query.range(offsetCount, offsetCount + fetchLimit - 1);
 
             if (tableName === 'subscriptions' || tableName === 'currentaffairs' || tableName === 'gk' || tableName === 'notifications' || tableName === 'flashcards' || tableName === 'bookstore') {
                 query = query.order('id', { ascending: false });
@@ -164,7 +172,22 @@ export default async function handler(req: any, res: any) {
             
             if (!error && data && data.length > 0) {
                 if (tableName === 'questionbank') {
-                    const processedQuestions = data.map(q => {
+                    let finalData = data;
+                    if (topic && topic !== 'mixed') {
+                        const targetWords = topic.toLowerCase().split(/[\s,.-]+/).filter((w: string) => w.length > 2);
+                        finalData = data.map(q => {
+                            const qText = `${q.topic || ''} ${q.subject || ''}`.toLowerCase();
+                            let score = 0;
+                            // Exact match gives highest score
+                            if (qText.includes(topic.toLowerCase())) score += 10;
+                            targetWords.forEach((w: string) => { if (qText.includes(w)) score++; });
+                            return { ...q, _score: score };
+                        }).sort((a, b) => b._score - a._score).slice(0, limitCount);
+                    } else {
+                        finalData = data.slice(0, limitCount);
+                    }
+
+                    const processedQuestions = finalData.map(q => {
                         const originalOptions = smartParseOptions(q.options);
                         if (originalOptions.length === 0) return { ...q, options: [], correctAnswerIndex: 1, subject: normalizeSubject(q.subject, q.topic, q.question) };
                         const originalCorrectIdx = Math.max(0, Math.min(parseInt(String(q.correct_answer_index || '1')) - 1, originalOptions.length - 1));

@@ -307,24 +307,30 @@ export async function runDailyUpdateScrapers() {
             const { data: sData } = await supabase.from('syllabus').select('topic, title');
             const qData = await fetchAllSupabaseData('questionbank', 'topic, subject');
             
-            const topicCounts = new Map<string, number>();
-            qData?.forEach(q => {
-                const qTopic = String(q.topic || '').toLowerCase().trim();
-                const qSubject = String(q.subject || '').toLowerCase().trim();
-                if (qTopic) {
-                    topicCounts.set(qTopic, (topicCounts.get(qTopic) || 0) + 1);
-                } else if (qSubject) {
-                    topicCounts.set(qSubject, (topicCounts.get(qSubject) || 0) + 1);
-                }
-            });
-
             const uniqueTopics = new Set<string>();
             const sortedTopics = (sData || []).map(s => {
                 let t = s.topic;
                 if (!t || t === 'null' || t.trim() === '') t = s.title;
                 if (!t || t === 'null' || t.trim() === '') t = "Unnamed Topic";
                 const sTopic = String(t).toLowerCase().trim();
-                return { topic: t, sTopic, count: topicCounts.get(sTopic) || 0 };
+                
+                const sTopicWords = sTopic.split(/[\s,.-]+/).filter(w => w.length > 2);
+                const count = qData?.filter(q => {
+                    const qTopic = String(q.topic || '').toLowerCase().trim();
+                    const qSubject = String(q.subject || '').toLowerCase().trim();
+                    
+                    if (qTopic === sTopic) return true;
+                    if (qTopic === '' && qSubject === sTopic) return true;
+                    if (sTopicWords.length > 0) {
+                        const qText = `${qTopic} ${qSubject}`;
+                        let score = 0;
+                        sTopicWords.forEach(w => { if (qText.includes(w)) score++; });
+                        if (score >= Math.ceil(sTopicWords.length / 2)) return true;
+                    }
+                    return false;
+                }).length || 0;
+
+                return { topic: t, sTopic, count };
             }).filter(s => {
                 if (uniqueTopics.has(s.sTopic)) return false;
                 uniqueTopics.add(s.sTopic);

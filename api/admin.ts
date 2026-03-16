@@ -166,17 +166,6 @@ export default async function handler(req: any, res: any) {
                 const { data: sData } = await supabase.from('syllabus').select('topic, title');
                 const qData = await fetchAllSupabaseData('questionbank', 'topic, subject');
                 
-                const topicCounts = new Map<string, number>();
-                qData?.forEach(q => {
-                    const qTopic = String(q.topic || '').toLowerCase().trim();
-                    const qSubject = String(q.subject || '').toLowerCase().trim();
-                    if (qTopic) {
-                        topicCounts.set(qTopic, (topicCounts.get(qTopic) || 0) + 1);
-                    } else if (qSubject) {
-                        topicCounts.set(qSubject, (topicCounts.get(qSubject) || 0) + 1);
-                    }
-                });
-
                 const uniqueTopics = new Set<string>();
                 const sortedTopics = (sData || []).map(s => {
                     let t = s.topic;
@@ -184,7 +173,23 @@ export default async function handler(req: any, res: any) {
                     if (!t || t === 'null' || t.trim() === '') t = "Unnamed Topic";
                     
                     const sTopic = String(t).toLowerCase().trim();
-                    const count = topicCounts.get(sTopic) || 0;
+                    const sTopicWords = sTopic.split(/[\s,.-]+/).filter(w => w.length > 2);
+                    
+                    const count = qData?.filter(q => {
+                        const qTopic = String(q.topic || '').toLowerCase().trim();
+                        const qSubject = String(q.subject || '').toLowerCase().trim();
+                        
+                        if (qTopic === sTopic) return true;
+                        if (qTopic === '' && qSubject === sTopic) return true;
+                        if (sTopicWords.length > 0) {
+                            const qText = `${qTopic} ${qSubject}`;
+                            let score = 0;
+                            sTopicWords.forEach(w => { if (qText.includes(w)) score++; });
+                            if (score >= Math.ceil(sTopicWords.length / 2)) return true;
+                        }
+                        return false;
+                    }).length || 0;
+
                     return { topic: t, sTopic, count };
                 }).filter(s => {
                     if (uniqueTopics.has(s.sTopic)) return false;
@@ -305,23 +310,33 @@ export default async function handler(req: any, res: any) {
                     // Stricter matching: 
                     // 1. Exact match on topic
                     // 2. If topic is very specific, don't just match subject
+                    const matchedTopics = new Set<string>();
+                    const sTopicWords = sTopic.split(/[\s,.-]+/).filter(w => w.length > 2);
+
                     const count = qData?.filter(q => {
                         const qTopic = String(q.topic || '').toLowerCase().trim();
                         const qSubject = String(q.subject || '').toLowerCase().trim();
                         
-                        // Exact topic match is the gold standard
-                        if (qTopic === sTopic) return true;
-                        
-                        // If the question's topic is empty but its subject matches this syllabus topic
-                        // (Only if the syllabus topic is actually a subject name)
-                        if (qTopic === '' && qSubject === sTopic) return true;
+                        let isMatch = false;
 
-                        // Support for slight variations if they are clearly the same
-                        // But avoid "Kerala" matching "Kerala History" if "Kerala History" is a separate topic
-                        return false;
+                        // Exact topic match is the gold standard
+                        if (qTopic === sTopic) isMatch = true;
+                        // If the question's topic is empty but its subject matches this syllabus topic
+                        else if (qTopic === '' && qSubject === sTopic) isMatch = true;
+                        // Word-based matching (similar to API fetching logic)
+                        else if (sTopicWords.length > 0) {
+                            const qText = `${qTopic} ${qSubject}`;
+                            let score = 0;
+                            sTopicWords.forEach(w => { if (qText.includes(w)) score++; });
+                            // If it matches at least half the words, consider it a match
+                            if (score >= Math.ceil(sTopicWords.length / 2)) isMatch = true;
+                        }
+
+                        if (isMatch && qTopic) matchedTopics.add(qTopic);
+                        return isMatch;
                     }).length || 0;
 
-                    gapReport.push({ id: s.id, topic: topicName, count, subject: s.subject });
+                    gapReport.push({ id: s.id, topic: topicName, count, subject: s.subject, matchedTopics: Array.from(matchedTopics) });
                 });
 
                 return res.status(200).json({ 
