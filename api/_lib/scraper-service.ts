@@ -300,7 +300,46 @@ export async function generateFlashCards(batchSize: number = 5) {
 
 export async function runDailyUpdateScrapers() {
     await Promise.all([scrapeKpscNotifications(), scrapePscLiveUpdates(), scrapeCurrentAffairs(), scrapeGkFacts()]);
-    await generateQuestionsForGaps(5);
+    
+    // Fetch top 5 topics with gaps and generate 5 questions for each
+    if (supabase) {
+        try {
+            const { data: sData } = await supabase.from('syllabus').select('topic, title');
+            const qData = await fetchAllSupabaseData('questionbank', 'topic, subject');
+            
+            const topicCounts = new Map<string, number>();
+            qData?.forEach(q => {
+                const qTopic = String(q.topic || '').toLowerCase().trim();
+                const qSubject = String(q.subject || '').toLowerCase().trim();
+                if (qTopic) {
+                    topicCounts.set(qTopic, (topicCounts.get(qTopic) || 0) + 1);
+                } else if (qSubject) {
+                    topicCounts.set(qSubject, (topicCounts.get(qSubject) || 0) + 1);
+                }
+            });
+
+            const uniqueTopics = new Set<string>();
+            const sortedTopics = (sData || []).map(s => {
+                let t = s.topic;
+                if (!t || t === 'null' || t.trim() === '') t = s.title;
+                if (!t || t === 'null' || t.trim() === '') t = "Unnamed Topic";
+                const sTopic = String(t).toLowerCase().trim();
+                return { topic: t, sTopic, count: topicCounts.get(sTopic) || 0 };
+            }).filter(s => {
+                if (uniqueTopics.has(s.sTopic)) return false;
+                uniqueTopics.add(s.sTopic);
+                return true;
+            }).sort((a, b) => a.count - b.count);
+
+            const batch = sortedTopics.slice(0, 5).map(s => s.topic);
+            for (const t of batch) { 
+                try { await generateQuestionsForGaps(t); } catch (err) { console.error(`Error filling gap for ${t}:`, err); } 
+            }
+        } catch (e) {
+            console.error("Error in daily gap filling:", e);
+        }
+    }
+
     await generateFlashCards(3);
     return { message: "Daily Update Routine Finished." };
 }

@@ -91,7 +91,7 @@ const App: React.FC = () => {
             const mt = MOCK_TESTS_DATA.find(m => String(m.id) === String(parts[2]));
             if (mt) setActiveTest({ title: mt.title.ml, questionsCount: mt.questionsCount, subject: 'mixed', topic: 'mixed', negativeMarking: mt.negativeMarking });
         } else if (parts[1] && parts[2] && parts[3]) {
-            setActiveTest({ subject: parts[1], topic: parts[2], questionsCount: parseInt(parts[3]) || 20, title: parts[4] ? decodeURIComponent(parts[4]) : parts[2] });
+            setActiveTest({ subject: decodeURIComponent(parts[1]), topic: decodeURIComponent(parts[2]), questionsCount: parseInt(parts[3]) || 20, title: parts[4] ? decodeURIComponent(parts[4]) : decodeURIComponent(parts[2]) });
         }
     }
 
@@ -138,11 +138,11 @@ const App: React.FC = () => {
         {(() => {
           switch(currentPage) {
             case 'admin_panel': return <AdminPage onBack={() => handleNavigate('dashboard')} />;
-            case 'exam_details': return selectedExam ? <ExamPage exam={selectedExam} content={EXAM_CONTENT_MAP[selectedExam.id] || EXAM_CONTENT_MAP['10th_level']} subscriptionStatus={subscriptionStatus} onBack={() => handleNavigate('dashboard')} onStartTest={(t: any) => handleNavigate(`test/${t.subject}/${t.topic}/${t.questions}/${encodeURIComponent(t.title)}`)} onStartStudy={(t: string) => handleNavigate(`study_material/${encodeURIComponent(t)}`)} onNavigate={handleNavigate} onNavigateToUpgrade={() => handleNavigate('upgrade')} /> : <div className="p-20 text-center">Finding Exam Data...</div>;
+            case 'exam_details': return selectedExam ? <ExamPage exam={selectedExam} content={EXAM_CONTENT_MAP[selectedExam.id] || EXAM_CONTENT_MAP['10th_level']} subscriptionStatus={subscriptionStatus} onBack={() => handleNavigate('dashboard')} onStartTest={(t: any) => handleNavigate(`test/${encodeURIComponent(t.subject)}/${encodeURIComponent(t.topic)}/${t.questions}/${encodeURIComponent(t.title)}`)} onStartStudy={(t: string) => handleNavigate(`study_material/${encodeURIComponent(t)}`)} onNavigate={handleNavigate} onNavigateToUpgrade={() => handleNavigate('upgrade')} /> : <div className="p-20 text-center">Finding Exam Data...</div>;
             case 'test': return activeTest ? <TestPage activeTest={activeTest} subscriptionStatus={subscriptionStatus} onTestComplete={(s, t, st, q, a) => { setTestResult({ score: s, total: t, stats: st, questions: q, answers: a }); handleNavigate('results'); }} onBack={() => window.history.back()} onNavigateToUpgrade={() => handleNavigate('upgrade')} /> : <div className="text-center p-20">Loading...</div>;
             case 'results': return testResult ? <TestResultPage score={testResult.score} total={testResult.total} stats={testResult.stats} questions={testResult.questions} answers={testResult.answers} onBackToPrevious={() => handleNavigate('dashboard')} /> : <Dashboard onNavigateToExam={e => handleNavigate(`exam_details/${e.id}`)} onNavigate={handleNavigate} onStartStudy={(t) => handleNavigate(`study_material/${encodeURIComponent(t)}`)} />;
             case 'bookstore': return <BookstorePage onBack={() => handleNavigate('dashboard')} />;
-            case 'quiz_home': return <QuizHomePage onBack={() => handleNavigate('dashboard')} onStartQuiz={(c) => handleNavigate(`test/${c.id.split('_')[0]}/mixed/15/${encodeURIComponent(c.title.ml)}`)} subscriptionStatus={subscriptionStatus} />;
+            case 'quiz_home': return <QuizHomePage onBack={() => handleNavigate('dashboard')} onStartQuiz={(c) => handleNavigate(`test/${encodeURIComponent(c.title.en)}/mixed/15/${encodeURIComponent(c.title.ml)}`)} subscriptionStatus={subscriptionStatus} />;
             case 'mock_test_home': return <MockTestHomePage onBack={() => handleNavigate('dashboard')} onStartTest={(t) => handleNavigate(`test/mock/${t.id}`)} />;
             case 'psc_live_updates': return <PscLiveUpdatesPage onBack={() => handleNavigate('dashboard')} />;
             case 'previous_papers': return <PreviousPapersPage onBack={() => handleNavigate('dashboard')} />;

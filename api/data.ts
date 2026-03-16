@@ -139,10 +139,10 @@ export default async function handler(req: any, res: any) {
             let query = supabase.from(tableName).select('*');
             if (tableName === 'syllabus' && examId) query = query.eq('exam_id', String(examId));
             if (tableName === 'questionbank') {
-                if (subject && subject !== 'mixed' && subject !== 'General') {
-                    query = query.or(`subject.ilike.%${subject}%,topic.ilike.%${subject}%`);
-                } else if (topic && topic !== 'mixed') {
+                if (topic && topic !== 'mixed') {
                     query = query.ilike('topic', `%${topic}%`);
+                } else if (subject && subject !== 'mixed' && subject !== 'General') {
+                    query = query.ilike('subject', `%${subject}%`);
                 }
             }
             

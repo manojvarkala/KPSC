@@ -177,6 +177,7 @@ export default async function handler(req: any, res: any) {
                     }
                 });
 
+                const uniqueTopics = new Set<string>();
                 const sortedTopics = (sData || []).map(s => {
                     let t = s.topic;
                     if (!t || t === 'null' || t.trim() === '') t = s.title;
@@ -184,7 +185,11 @@ export default async function handler(req: any, res: any) {
                     
                     const sTopic = String(t).toLowerCase().trim();
                     const count = topicCounts.get(sTopic) || 0;
-                    return { topic: t, count };
+                    return { topic: t, sTopic, count };
+                }).filter(s => {
+                    if (uniqueTopics.has(s.sTopic)) return false;
+                    uniqueTopics.add(s.sTopic);
+                    return true;
                 }).sort((a, b) => a.count - b.count);
 
                 if (sortedTopics.length === 0) return res.status(200).json({ message: "No topics found in syllabus." });
