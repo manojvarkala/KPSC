@@ -64,6 +64,37 @@ export async function upsertSupabaseData(table: string, data: any[], onConflict:
     return result;
 }
 
+export async function fetchAllSupabaseData(table: string, select: string = '*') {
+    if (!supabase) return [];
+    let allData: any[] = [];
+    let from = 0;
+    const step = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+        const { data, error } = await supabase
+            .from(table)
+            .select(select)
+            .range(from, from + step - 1);
+            
+        if (error) {
+            console.error(`Error fetching all data from ${table}:`, error.message);
+            break;
+        }
+
+        if (data && data.length > 0) {
+            allData = [...allData, ...data];
+            from += step;
+            if (data.length < step) {
+                hasMore = false;
+            }
+        } else {
+            hasMore = false;
+        }
+    }
+    return allData;
+}
+
 export async function deleteSupabaseRow(table: string, id: string) {
     if (!supabase) return null;
     const cleanTable = table.toLowerCase();

@@ -20,7 +20,7 @@ import {
     APPROVED_SUBJECTS
 } from "./_lib/scraper-service.js";
 import { auditAndCorrectQuestions } from "./_lib/audit-service.js";
-import { supabase, upsertSupabaseData, deleteSupabaseRow } from "./_lib/supabase-service.js";
+import { supabase, upsertSupabaseData, deleteSupabaseRow, fetchAllSupabaseData } from "./_lib/supabase-service.js";
 
 async function getRequestBody(req: any) {
     // If body is already an object, return it (standard for many serverless platforms)
@@ -208,14 +208,14 @@ export default async function handler(req: any, res: any) {
                     .from('questionbank')
                     .select('*', { count: 'exact', head: true });
 
-                // 2. Fetch data for classification audit (limited to 10k for performance)
-                const { data: qData } = await supabase.from('questionbank').select('topic, subject').limit(10000);
+                // 2. Fetch data for classification audit (using pagination to get all rows)
+                const qData = await fetchAllSupabaseData('questionbank', 'id, topic, subject');
                 const { data: sData } = await supabase.from('syllabus').select('id, topic, title, subject');
                 
                 const totalQuestions = realTotalCount || qData?.length || 0;
                 
                 // 3. Fetch last audited ID
-                const { data: lastAuditedSetting } = await supabase.from('settings').select('value').eq('key', 'last_audited_id').single();
+                const { data: lastAuditedSetting } = await supabase.from('settings').select('value').eq('id', 'last_audited_id').single();
                 const lastAuditedId = parseInt(lastAuditedSetting?.value || '0');
 
                 // 4. Prepare syllabus topic list for matching
@@ -230,6 +230,9 @@ export default async function handler(req: any, res: any) {
                 const subjectMismatches: string[] = [];
                 const unapprovedTopics: string[] = [];
                 let questionSubjectMismatches = 0;
+                
+                const normalizationTodoIds: number[] = [];
+                const repairTodoIds: number[] = [];
 
                 qData?.forEach(q => { 
                     const s = String(q.subject || '').trim();
@@ -255,7 +258,21 @@ export default async function handler(req: any, res: any) {
                             if (!unapprovedTopics.includes(t)) unapprovedTopics.push(t);
                         }
                     }
+
+                    // Populate TODO lists
+                    if (tLower === '' || tLower === 'null' || sLower === '' || sLower === 'null' || !approvedLower.includes(sLower)) {
+                        repairTodoIds.push(q.id);
+                    }
+                    if (tLower === '' || tLower === 'null' || !syllabusTopicsLower.includes(tLower)) {
+                        normalizationTodoIds.push(q.id);
+                    }
                 });
+
+                // Save TODO lists to settings
+                await upsertSupabaseData('settings', [
+                    { id: 'normalization_todo_ids', value: JSON.stringify(normalizationTodoIds) },
+                    { id: 'repair_todo_ids', value: JSON.stringify(repairTodoIds) }
+                ]);
 
                 const uniqueTopics = new Set<string>();
                 const gapReport: any[] = [];

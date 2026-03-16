@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { readSheetData, findAndUpsertRow, batchUpsertRows } from './sheets-service.js';
-import { supabase, upsertSupabaseData } from './supabase-service.js';
+import { supabase, upsertSupabaseData, fetchAllSupabaseData } from './supabase-service.js';
 
 declare var process: any;
 const AFFILIATE_TAG = 'tag=malayalambooks-21';
@@ -498,31 +498,31 @@ export async function repairLanguageMismatches() {
 export async function repairBlankTopics() {
     if (!supabase) throw new Error("Supabase required.");
     
-    // Fetch all question IDs, topics, and subjects to find the unmapped ones
-    // This avoids PostgREST URL length limits and syntax errors with large IN clauses
-    const { data: allQ, error: fetchErr } = await supabase.from('questionbank').select('id, topic, subject');
-    if (fetchErr) throw fetchErr;
-
-    const approvedSubjectsLower = APPROVED_SUBJECTS.map(s => String(s).toLowerCase().trim());
-    
-    const unmappedIds = (allQ || []).filter(q => {
-        const t = String(q.topic || '').toLowerCase().trim();
-        const s = String(q.subject || '').toLowerCase().trim();
-        return t === '' || t === 'null' || s === '' || s === 'null' || !approvedSubjectsLower.includes(s);
-    }).map(q => q.id).slice(0, 50); // Get up to 50 IDs to repair
-
-    if (unmappedIds.length === 0) {
-        return { message: "No questions needing repair found." };
+    // Read TODO list from settings
+    const { data: todoSetting } = await supabase.from('settings').select('value').eq('id', 'repair_todo_ids').single();
+    let unmappedIds: number[] = [];
+    if (todoSetting && todoSetting.value) {
+        try { unmappedIds = JSON.parse(todoSetting.value); } catch (e) {}
     }
+
+    if (!unmappedIds || unmappedIds.length === 0) {
+        return { message: "No questions needing repair found. Please click 'Refresh Report' to scan the database first." };
+    }
+
+    const batchIds = unmappedIds.slice(0, 50);
 
     // Fetch the full data for the questions to repair
     const { data: toRepair, error: repairErr } = await supabase
         .from('questionbank')
         .select('*')
-        .in('id', unmappedIds);
+        .in('id', batchIds);
 
     if (repairErr) throw repairErr;
-    if (!toRepair || toRepair.length === 0) return { message: "Could not fetch questions to repair." };
+    if (!toRepair || toRepair.length === 0) {
+        const remainingIds = unmappedIds.filter(id => !batchIds.includes(id));
+        await upsertSupabaseData('settings', [{ id: 'repair_todo_ids', value: JSON.stringify(remainingIds) }]);
+        return { message: "Could not fetch questions to repair. Cleaned up stale IDs." };
+    }
 
     try {
         // Get approved topics from syllabus for strict mapping
@@ -584,6 +584,11 @@ export async function repairBlankTopics() {
                 data: [q.id, q.topic, q.question, JSON.stringify(q.options), q.correct_answer_index, q.subject, q.difficulty, q.explanation]
             }));
             await batchUpsertRows('QuestionBank', sheetRows);
+            
+            // Update TODO list
+            const remainingIds = unmappedIds.filter(id => !batchIds.includes(id));
+            await upsertSupabaseData('settings', [{ id: 'repair_todo_ids', value: JSON.stringify(remainingIds) }]);
+            
             return { message: `Successfully repaired ${finalData.length} questions (Fixed blanks or unapproved subjects).` };
         }
     } catch (e: any) { 
@@ -633,32 +638,41 @@ export async function normalizeTopics() {
     
     if (approvedTopics.length === 0) throw new Error("No syllabus topics found to normalize against.");
 
-    // 2. Fetch all question IDs and topics to find the unmapped ones
-    // This avoids PostgREST URL length limits and syntax errors with large IN clauses
-    const { data: allQ, error: fetchErr } = await supabase.from('questionbank').select('id, topic');
-    if (fetchErr) throw fetchErr;
-
-    const approvedLower = approvedTopics.map(t => String(t).toLowerCase().trim());
-    
-    const unmappedIds = (allQ || []).filter(q => {
-        const t = String(q.topic || '').toLowerCase().trim();
-        return t === '' || t === 'null' || !approvedLower.includes(t);
-    }).map(q => q.id).slice(0, 50); // Get up to 50 IDs to repair
-
-    if (unmappedIds.length === 0) {
-        return { message: "All questions are already mapped to approved syllabus topics." };
+    // 2. Read TODO list from settings
+    const { data: todoSetting } = await supabase.from('settings').select('value').eq('id', 'normalization_todo_ids').single();
+    let unmappedIds: number[] = [];
+    if (todoSetting && todoSetting.value) {
+        try { unmappedIds = JSON.parse(todoSetting.value); } catch (e) {}
     }
+
+    if (!unmappedIds || unmappedIds.length === 0) {
+        return { message: "No pending questions found. Please click 'Refresh Report' to scan the database first." };
+    }
+
+    const batchIds = unmappedIds.slice(0, 50);
 
     // 3. Fetch the full data for the questions to repair
     const { data: toRepair, error: repairErr } = await supabase
         .from('questionbank')
         .select('*')
-        .in('id', unmappedIds);
+        .in('id', batchIds);
 
     if (repairErr) throw repairErr;
-    if (!toRepair || toRepair.length === 0) return { message: "Could not fetch questions to repair." };
+    
+    if (!toRepair || toRepair.length === 0) {
+        // If we couldn't fetch them, maybe they were deleted. Remove from TODO and return.
+        const remainingIds = unmappedIds.filter(id => !batchIds.includes(id));
+        await upsertSupabaseData('settings', [{ id: 'normalization_todo_ids', value: JSON.stringify(remainingIds) }]);
+        return { message: "Could not fetch questions to repair. Cleaned up stale IDs." };
+    }
 
-    return await processNormalizationBatch(toRepair, approvedTopics);
+    const result = await processNormalizationBatch(toRepair, approvedTopics);
+
+    // 4. Update TODO list
+    const remainingIds = unmappedIds.filter(id => !batchIds.includes(id));
+    await upsertSupabaseData('settings', [{ id: 'normalization_todo_ids', value: JSON.stringify(remainingIds) }]);
+
+    return result;
 }
 
 async function processNormalizationBatch(toRepair: any[], approvedTopics: string[]) {
