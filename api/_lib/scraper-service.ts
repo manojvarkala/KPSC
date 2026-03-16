@@ -621,43 +621,47 @@ export async function syncSupabaseToSheets() {
     return { message: `Pushed ${totalUpdated} records from Supabase to Sheets.` };
 }
 
-const TOPICS_TO_REPLACE = [
-    "Active and Passive Voice", "Ancient Indian History", "Chemical Formulas", "Digestive System", "Districts of Kerala", 
-    "Electrical Engineering", "Formation of Kerala", "General Science / Science & Tech", "Human Respiratory System", 
-    "Indian Independence Movement", "Indus Valley Civilization", "Maurya Empire", "Modern Indian History", "Nouns", 
-    "Periodic Table", "Post-Independent India", "Renaissance Leaders", "Respiratory System", "Revolt of 1857", 
-    "Rivers and Lakes of Kerala", "Rivers of Kerala", "Singular and Plural Nouns", "Tense and Verbs", "Vaikom Satyagraha", 
-    "Welfare Schemes in Kerala", "Ancient Indian Literature", "Banking in India", "Battle of Buxar", "British Rule in Kerala", 
-    "Clocks", "Cognitive Development", "Communal Award", "Communication Skills", "Computer Hardware", "Computer Memory", 
-    "Delhi Sultanate", "Direction Sense Test", "Educational Reforms in British India", "Factors of Development", 
-    "Five Year Plans", "Gandhiji in Kerala", "Goods and Services Tax (GST)", "Governor Generals & Viceroys", 
-    "Growth and Development", "GST", "Gupta Empire", "History of Psychology", "Indian National Congress", 
-    "Indian National Movement", "Industrial Revolution", "Input Devices", "Intelligence Quotient", "Jnanpith Award", 
-    "Kerala Renaissance Leaders", "L.C.M", "Learning Theories", "Malayalam Literature", "Maratha Administration", 
-    "Mauryan Administration", "Medieval Indian History", "Memory and Forgetting", "Mughal Empire", "Muscular System", 
-    "NITI Aayog", "Output Devices", "Pazhassi Revolt", "Peasant Movements", "Post-Mauryan Period", "Press and Newspapers", 
-    "Principles of Development", "Reading Comprehension", "Reserve Bank of India", "Sandhi", "Satavahana Dynasty", 
-    "Schools of Psychology", "Scientific Discoveries", "Scientific Inventions", "Simon Commission", "Spelling and Word Usage", 
-    "Square and Square Root", "Stages of Development", "Tense", "Time and Distance", "Time and Work", "Travancore Kingdom", 
-    "Vaccines and Immunization", "Vigraharoopam", "Voice"
-];
 
 export async function normalizeTopics() {
     if (!supabase) throw new Error("Supabase required.");
     
     // 1. Get approved topics from syllabus
     const { data: sData } = await supabase.from('syllabus').select('topic, title, subject');
-    const approvedTopics = (sData || []).map(s => s.topic || s.title).filter(Boolean);
+    const approvedTopics = Array.from(new Set((sData || []).map(s => s.topic || s.title).filter(Boolean)));
     
-    // 2. Find questions with topics in the "to replace" list
-    const { data: toRepair } = await supabase
+    if (approvedTopics.length === 0) throw new Error("No syllabus topics found to normalize against.");
+
+    // 2. Find questions with topics NOT in the approved list
+    // Using a direct query with .not('topic', 'in', [...]) is much faster than fetching all topics
+    // We also handle null/empty topics just in case
+    const approvedListString = `(${approvedTopics.map(t => `"${t.replace(/"/g, '""')}"`).join(',')})`;
+    
+    const { data: toRepair, error } = await supabase
         .from('questionbank')
         .select('*')
-        .in('topic', TOPICS_TO_REPLACE)
-        .limit(50); // Process in batches
+        .or(`topic.is.null,topic.eq."",topic.not.in.${approvedListString}`)
+        .limit(50);
         
-    if (!toRepair || toRepair.length === 0) return { message: "No questions found with topics needing replacement." };
+    if (error) {
+        console.error("Normalization Query Error:", error);
+        // Fallback: If the complex OR query fails, try a simpler batch check
+        const { data: batch } = await supabase.from('questionbank').select('*').limit(500);
+        const approvedLower = approvedTopics.map(t => String(t).toLowerCase().trim());
+        const filtered = (batch || []).filter(q => {
+            const t = String(q.topic || '').toLowerCase().trim();
+            return t === '' || !approvedLower.includes(t);
+        }).slice(0, 50);
+        
+        if (filtered.length === 0) return { message: "No questions found needing normalization in the current batch." };
+        return await processNormalizationBatch(filtered, approvedTopics);
+    }
 
+    if (!toRepair || toRepair.length === 0) return { message: "All questions are already mapped to approved syllabus topics." };
+
+    return await processNormalizationBatch(toRepair, approvedTopics);
+}
+
+async function processNormalizationBatch(toRepair: any[], approvedTopics: string[]) {
     try {
         const ai = getAi();
         const response = await ai.models.generateContent({
