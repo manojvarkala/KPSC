@@ -152,7 +152,7 @@ export async function generateQuestionsForGaps(batchSizeOrTopic: number | string
     } else {
         const { data: sData } = await supabase.from('syllabus').select('topic, subject, title');
         if (!sData?.length) return { message: "No syllabus found." };
-        const { data: qData } = await supabase.from('questionbank').select('topic');
+        const qData = await fetchAllSupabaseData('questionbank', 'topic');
         const counts: Record<string, number> = {};
         qData?.forEach(q => { const t = String(q.topic || '').toLowerCase().trim(); if (t) counts[t] = (counts[t] || 0) + 1; });
         targetMappings = sData.map(s => {

@@ -164,32 +164,32 @@ export default async function handler(req: any, res: any) {
             case 'run-all-gaps': {
                 if (!supabase) throw new Error("Supabase required.");
                 const { data: sData } = await supabase.from('syllabus').select('topic, title');
-                const { data: qData } = await supabase.from('questionbank').select('topic, subject');
+                const qData = await fetchAllSupabaseData('questionbank', 'topic, subject');
                 
-                const emptyTopics = (sData || []).filter(s => {
+                const topicCounts = new Map<string, number>();
+                qData?.forEach(q => {
+                    const qTopic = String(q.topic || '').toLowerCase().trim();
+                    const qSubject = String(q.subject || '').toLowerCase().trim();
+                    if (qTopic) {
+                        topicCounts.set(qTopic, (topicCounts.get(qTopic) || 0) + 1);
+                    } else if (qSubject) {
+                        topicCounts.set(qSubject, (topicCounts.get(qSubject) || 0) + 1);
+                    }
+                });
+
+                const sortedTopics = (sData || []).map(s => {
                     let t = s.topic;
                     if (!t || t === 'null' || t.trim() === '') t = s.title;
                     if (!t || t === 'null' || t.trim() === '') t = "Unnamed Topic";
                     
                     const sTopic = String(t).toLowerCase().trim();
-                    const hasQuestions = qData?.some(q => {
-                        const qTopic = String(q.topic || '').toLowerCase().trim();
-                        const qSubject = String(q.subject || '').toLowerCase().trim();
-                        
-                        if (qTopic === sTopic) return true;
-                        if (qTopic === '' && qSubject === sTopic) return true;
-                        return false;
-                    });
-                    return !hasQuestions;
-                }).map(s => {
-                    let t = s.topic;
-                    if (!t || t === 'null' || t.trim() === '') t = s.title;
-                    if (!t || t === 'null' || t.trim() === '') t = "Unnamed Topic";
-                    return t;
-                });
+                    const count = topicCounts.get(sTopic) || 0;
+                    return { topic: t, count };
+                }).sort((a, b) => a.count - b.count);
 
-                if (emptyTopics.length === 0) return res.status(200).json({ message: "No empty topics found." });
-                const batch = emptyTopics.slice(0, 5);
+                if (sortedTopics.length === 0) return res.status(200).json({ message: "No topics found in syllabus." });
+                
+                const batch = sortedTopics.slice(0, 5).map(s => s.topic);
                 for (const t of batch) { try { await generateQuestionsForGaps(t); } catch (err) {} }
                 return res.status(200).json({ message: `Filled gaps for ${batch.length} topics.` });
             }
