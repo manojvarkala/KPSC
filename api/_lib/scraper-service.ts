@@ -474,7 +474,7 @@ export async function runBookScraper() {
 export async function repairLanguageMismatches() {
     if (!supabase) throw new Error("Supabase required.");
     const technicalSubjects = ['English', 'Engineering', 'IT', 'Computer Science', 'Technical', 'Nursing'];
-    const { data: mismatches } = await supabase.from('questionbank').select('*').in('subject', technicalSubjects).limit(30);
+    const { data: mismatches } = await supabase.from('questionbank').select('*').in('subject', technicalSubjects).limit(50);
     if (!mismatches || mismatches.length === 0) return { message: "No mismatches found." };
 
     try {
@@ -503,20 +503,20 @@ export async function repairBlankTopics() {
         .from('questionbank')
         .select('*')
         .or('topic.is.null,topic.eq."",subject.is.null,subject.eq.""')
-        .limit(20);
+        .limit(50);
         
     if (blankErr) throw blankErr;
     
     let toRepair = blanks || [];
     
     // 2. If no blanks, look for subjects not in the approved list
-    if (toRepair.length < 20) {
+    if (toRepair.length < 50) {
         const approvedListString = `(${APPROVED_SUBJECTS.map(s => `"${s}"`).join(',')})`;
         const { data: invalid, error: invErr } = await supabase
             .from('questionbank')
             .select('*')
             .not('subject', 'in', approvedListString)
-            .limit(20 - toRepair.length);
+            .limit(50 - toRepair.length);
             
         if (invErr) {
             console.warn("Invalid subject query failed (likely due to special characters), falling back to batch check.");
@@ -530,25 +530,31 @@ export async function repairBlankTopics() {
         const { data: batch } = await supabase
             .from('questionbank')
             .select('*')
-            .limit(200);
+            .limit(500);
             
         toRepair = (batch || []).filter(q => 
             !q.topic || q.topic.trim() === "" || 
             !q.subject || q.subject.trim() === "" || 
             !APPROVED_SUBJECTS.includes(q.subject)
-        ).slice(0, 20);
+        ).slice(0, 50);
     }
         
     if (toRepair.length === 0) return { message: "No questions needing repair found." };
 
     try {
+        // Get approved topics from syllabus for strict mapping
+        const { data: sData } = await supabase.from('syllabus').select('topic, title');
+        const approvedTopics = Array.from(new Set((sData || []).map(s => s.topic || s.title).filter(Boolean)));
+
         const ai = getAi();
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: `Analyze these Kerala PSC questions and assign the most appropriate Topic and Subject for each.
             
-            CRITICAL: Subject MUST be exactly one from this list: [${APPROVED_SUBJECTS.join(', ')}]
-            Topic should be a specific micro-topic (e.g., "Rivers of Kerala", "Fundamental Rights", "Percentage").
+            CRITICAL RULES:
+            1. Subject MUST be exactly one from this list: [${APPROVED_SUBJECTS.join(', ')}]
+            2. Topic MUST be exactly one from this Approved Topics list: [${approvedTopics.join(', ')}]
+            3. If no perfect match exists in the Approved Topics list, pick the most relevant one. DO NOT invent new topics.
             
             Syllabus Context for mapping:
             ${JSON.stringify(SYLLABUS_STRUCTURE, null, 2)}
@@ -669,8 +675,8 @@ export async function normalizeTopics() {
             
             Rules:
             1. If a direct match exists in Approved Topics, use it.
-            2. If no direct match, pick the most relevant micro-topic.
-            3. Ensure the Subject is also correct according to the new Topic.
+            2. If no direct match, pick the most relevant micro-topic from the Approved Topics list. DO NOT invent new topics.
+            3. Ensure the Subject is also correct according to the new Topic and must be from the Approved Subjects list.
             
             Return JSON array: [{ "id": number, "topic": "string", "subject": "string" }]`,
             config: { responseMimeType: "application/json" }
