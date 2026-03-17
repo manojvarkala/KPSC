@@ -21,7 +21,7 @@ import {
 } from "./_lib/scraper-service.js";
 import { auditAndCorrectQuestions } from "./_lib/audit-service.js";
 import { supabase, upsertSupabaseData, deleteSupabaseRow, fetchAllSupabaseData } from "./_lib/supabase-service.js";
-import { normalizeSubject } from "./_lib/utils.js";
+import { normalizeSubject, smartParseOptions } from "./_lib/utils.js";
 
 async function getRequestBody(req: any) {
     // If body is already an object, return it (standard for many serverless platforms)
@@ -288,6 +288,26 @@ export default async function handler(req: any, res: any) {
                     }
                 }
                 return res.status(200).json({ message: `Normalized ${updates.length} subjects.` });
+            }
+
+            case 'repair-options': {
+                if (!supabase) throw new Error("Supabase required.");
+                const qData = await fetchAllSupabaseData('questionbank', 'id, options');
+                const updates = qData.map(q => {
+                    const original = q.options;
+                    const parsed = smartParseOptions(original);
+                    if (JSON.stringify(parsed) !== JSON.stringify(original)) {
+                        return { id: q.id, options: parsed };
+                    }
+                    return null;
+                }).filter(Boolean) as any[];
+
+                if (updates.length > 0) {
+                    for (let i = 0; i < updates.length; i += 100) {
+                        await upsertSupabaseData('questionbank', updates.slice(i, i + 100));
+                    }
+                }
+                return res.status(200).json({ message: `Repaired options for ${updates.length} questions.` });
             }
 
             case 'run-all-gaps': {

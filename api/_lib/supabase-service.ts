@@ -1,5 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
+import { smartParseOptions } from './utils.js';
 
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
@@ -41,6 +42,11 @@ export async function upsertSupabaseData(table: string, data: any[], onConflict:
         if (entry.questions !== undefined) entry.questions = parseInt(String(entry.questions || '0'));
         if (entry.duration !== undefined) entry.duration = parseInt(String(entry.duration || '0'));
         
+        // Options sanitization for questionbank
+        if (cleanTable === 'questionbank' && entry.options !== undefined) {
+            entry.options = smartParseOptions(entry.options);
+        }
+
         return entry;
     });
 

@@ -4,6 +4,8 @@ import type { QuizQuestion, UserAnswers, SubscriptionStatus, ActiveTest } from '
 import { getQuestionsForTest } from '../services/pscDataService';
 import Modal from './Modal';
 import { ClockIcon } from './icons/ClockIcon';
+import { ChevronLeftIcon } from './icons/ChevronLeftIcon';
+import { ChevronRightIcon } from './icons/ChevronRightIcon';
 import { useTranslation } from '../contexts/LanguageContext';
 
 interface TestPageProps {
@@ -172,31 +174,33 @@ const TestPage: React.FC<TestPageProps> = ({ activeTest, subscriptionStatus, onT
         </div>
 
         {/* Footer Actions */}
-        <div className="flex justify-between items-center mt-4 pt-4 border-t dark:border-slate-800 flex-shrink-0">
+        <div className="flex justify-between items-center mt-6 pt-6 border-t dark:border-slate-800 flex-shrink-0">
           <button 
             onClick={() => setCurrentIndex(c => Math.max(0, c-1))} 
             disabled={currentIndex===0} 
-            className="px-6 py-3 font-black text-slate-400 hover:text-indigo-600 disabled:opacity-20 uppercase text-[10px]"
+            className="flex items-center gap-2 px-6 py-3 font-black text-slate-400 hover:text-indigo-600 disabled:opacity-20 uppercase text-[10px] tracking-widest transition-all group"
           >
+            <ChevronLeftIcon className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
             {t('test.previous')}
           </button>
           
-          <div className="flex space-x-2">
+          <div className="flex items-center space-x-3">
             {!isLast ? (
               <button 
                 onClick={() => setCurrentIndex(c => c+1)} 
-                className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-black shadow-lg hover:bg-indigo-700 transition-all uppercase text-[10px] tracking-widest"
+                className="flex items-center gap-2 bg-white dark:bg-slate-800 text-indigo-600 border-2 border-indigo-100 dark:border-indigo-900 px-8 py-3 rounded-2xl font-black shadow-sm hover:shadow-md hover:border-indigo-300 transition-all uppercase text-[10px] tracking-widest group"
               >
                 {t('test.next')}
+                <ChevronRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </button>
             ) : null}
             
             <button 
               onClick={() => isLast && setIsSubmitModalOpen(true)} 
               disabled={!isLast}
-              className={`px-8 py-3 rounded-xl font-black shadow-xl transition-all active:scale-95 uppercase text-[10px] tracking-widest border-b-4 ${
+              className={`px-8 py-3 rounded-2xl font-black shadow-xl transition-all active:scale-95 uppercase text-[10px] tracking-widest border-b-4 ${
                 isLast 
-                ? 'bg-indigo-600 text-white border-indigo-800 cursor-pointer opacity-100' 
+                ? 'bg-indigo-600 text-white border-indigo-800 cursor-pointer opacity-100 hover:bg-indigo-700' 
                 : 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed opacity-50'
               }`}
             >

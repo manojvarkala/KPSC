@@ -151,7 +151,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         try {
             const r = await adminOp(action, payload);
             setStatus(r.message || "Action completed successfully.");
-            if (['delete-row', 'rebuild-db', 'sync-to-sheets', 'run-daily-sync', 'run-book-scraper', 'update-setting', 'save-row', 'run-batch-qa', 'run-language-repair', 'run-topic-repair', 'run-explanation-repair', 'run-all-gaps', 'run-targeted-gap-fill', 'normalize-topics'].includes(action)) {
+            if (['delete-row', 'rebuild-db', 'sync-to-sheets', 'run-daily-sync', 'run-book-scraper', 'update-setting', 'save-row', 'run-batch-qa', 'run-language-repair', 'run-topic-repair', 'run-explanation-repair', 'run-all-gaps', 'run-targeted-gap-fill', 'normalize-topics', 'normalize-subjects', 'repair-options'].includes(action)) {
                 await refreshData(true);
             }
         } catch(e:any) { setStatus(e.message); setIsError(true); }
@@ -303,6 +303,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                 <ToolCard title="Rebuild Syllabus" icon={PlusIcon} action="rebuild-syllabus" color="bg-amber-600" desc="Populates the syllabus table with standard PSC topics for all exams. Use this if exams show zero micro-topics." />
                                 <ToolCard title="Reconfigure Syllabus" icon={Cog6ToothIcon} action="reconfigure-syllabus" color="bg-indigo-700" desc="Fixes existing syllabus entries that have 0 questions or 0 duration. Adjusts based on Prelims/Mains type." />
                                 <ToolCard title="Normalize Subjects" icon={ShieldCheckIcon} action="normalize-subjects" color="bg-teal-600" desc="Standardizes subject names in the question bank to match the approved list (e.g. 'Kerala History' instead of 'History of Kerala')." />
+                                <ToolCard title="Repair Options" icon={PencilSquareIcon} action="repair-options" color="bg-purple-600" desc="Fixes double-stringified or improperly formatted question options in the database." />
                             </div>
                         )}
 
@@ -536,7 +537,39 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                         </button>
                                     </div>
 
-                                    {Object.entries(settings).filter(([k]) => k !== 'free_pro_mode').map(([key, value]) => (
+                                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-xl">
+                                        <h4 className="text-lg font-black uppercase tracking-tight mb-6 flex items-center gap-2">
+                                            <ArrowPathIcon className="w-5 h-5 text-indigo-600" />
+                                            Daily Automation Controls
+                                        </h4>
+                                        <div className="space-y-4">
+                                            {[
+                                                { key: 'auto_update_news', label: 'PSC Notifications & Updates', desc: 'Scrapes latest news from KPSC website.', default: true },
+                                                { key: 'auto_update_ca', label: 'Current Affairs', desc: 'Daily current affairs updates.', default: true },
+                                                { key: 'auto_update_gk', label: 'GK Facts', desc: 'Daily general knowledge facts.', default: true },
+                                                { key: 'auto_update_ai_gaps', label: 'AI Question Generation', desc: 'Uses Gemini to fill syllabus gaps (High AI Cost).', warning: true, default: false },
+                                                { key: 'auto_update_flashcards', label: 'Daily Flashcards', desc: 'Generates new flashcards for users.', default: true }
+                                            ].map(item => {
+                                                const isEnabled = settings[item.key] === undefined ? item.default : settings[item.key] === 'true';
+                                                return (
+                                                    <div key={item.key} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                                                        <div>
+                                                            <p className={`text-sm font-black uppercase ${item.warning ? 'text-amber-600' : 'text-slate-900 dark:text-slate-100'}`}>{item.label}</p>
+                                                            <p className="text-[10px] font-bold text-slate-500">{item.desc}</p>
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => updateSetting(item.key, isEnabled ? 'false' : 'true')}
+                                                            className={`w-14 h-7 rounded-full p-1 transition-all ${isEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                                        >
+                                                            <div className={`w-5 h-5 bg-white rounded-full shadow-sm transform transition-transform ${isEnabled ? 'translate-x-7' : 'translate-x-0'}`} />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {Object.entries(settings).filter(([k]) => !['free_pro_mode', 'auto_update_news', 'auto_update_ca', 'auto_update_gk', 'auto_update_ai_gaps', 'auto_update_flashcards'].includes(k)).map(([key, value]) => (
                                         <div key={key} className="bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 flex flex-col gap-2">
                                             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">{key.replace(/_/g, ' ')}</label>
                                             <div className="flex items-center space-x-3">

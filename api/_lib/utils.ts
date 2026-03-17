@@ -35,3 +35,51 @@ export function normalizeSubject(subject: string, topic: string = '', question: 
     
     return subject || "General Knowledge";
 }
+
+/**
+ * Enhanced option parser that unwraps multiple layers of stringification.
+ */
+export const smartParseOptions = (raw: any): string[] => {
+    if (!raw) return [];
+    
+    const unwrap = (val: any): any => {
+        if (Array.isArray(val)) {
+            // If it's an array with one string that looks like a stringified array, unwrap it
+            if (val.length === 1 && typeof val[0] === 'string' && (val[0].trim().startsWith('[') || val[0].trim().startsWith('"['))) {
+                return unwrap(val[0]);
+            }
+            return val;
+        }
+        if (typeof val === 'string') {
+            const trimmed = val.trim();
+            // Handle various stringified formats: "[...]", "\"[...]\"", etc.
+            if (trimmed.startsWith('[') || trimmed.startsWith('"[')) {
+                try {
+                    let cleaned = trimmed;
+                    // Remove outer quotes if they exist and it's double stringified
+                    if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+                        cleaned = cleaned.slice(1, -1).replace(/\\"/g, '"');
+                    }
+                    const parsed = JSON.parse(cleaned);
+                    return unwrap(parsed);
+                } catch (e) {
+                    // If JSON.parse fails, try a manual split if it looks like a pipe-separated list
+                    if (trimmed.includes('|')) return trimmed.split('|').map(s => s.trim());
+                    return trimmed;
+                }
+            }
+            // Handle pipe-separated strings
+            if (trimmed.includes('|')) return trimmed.split('|').map(s => s.trim());
+        }
+        return val;
+    };
+
+    const final = unwrap(raw);
+    if (Array.isArray(final)) return final.map(String).filter(s => s.trim() !== '');
+    if (typeof final === 'string') {
+        const trimmed = final.trim();
+        if (trimmed === '') return [];
+        return [trimmed];
+    }
+    return [];
+};

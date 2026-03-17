@@ -2,6 +2,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { readSheetData, findAndUpsertRow, batchUpsertRows } from './sheets-service.js';
 import { supabase, upsertSupabaseData, fetchAllSupabaseData } from './supabase-service.js';
+import { smartParseOptions } from './utils.js';
 
 declare var process: any;
 const AFFILIATE_TAG = 'tag=malayalambooks-21';
@@ -12,7 +13,7 @@ function getAi() {
     return new GoogleGenAI({ apiKey: key.trim() });
 }
 
-function createNumericHash(str: string): number {
+const createNumericHash = (str: string): number => {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
         const char = str.charCodeAt(i);
@@ -20,17 +21,6 @@ function createNumericHash(str: string): number {
         hash = hash & hash;
     }
     return Math.abs(hash);
-}
-
-const ensureArray = (raw: any): string[] => {
-    if (!raw) return [];
-    if (Array.isArray(raw)) return raw.map(String);
-    try {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.map(String) : [String(raw)];
-    } catch {
-        return [String(raw)];
-    }
 };
 
 export const APPROVED_SUBJECTS = [
@@ -89,7 +79,7 @@ export async function bulkUploadQuestions(questions: any[]) {
         id: q.id || currentId++,
         topic: q.topic || 'General',
         question: q.question,
-        options: ensureArray(q.options),
+        options: smartParseOptions(q.options),
         correct_answer_index: parseInt(String(q.correct_answer_index || q.correctAnswerIndex || 1)),
         subject: q.subject || 'General Knowledge',
         difficulty: q.difficulty || 'PSC Level',
@@ -211,7 +201,7 @@ export async function generateQuestionsForGaps(batchSizeOrTopic: number | string
                     id: currentId++, 
                     topic: target.topic, 
                     question: item.question, 
-                    options: ensureArray(item.options), 
+                    options: smartParseOptions(item.options), 
                     correct_answer_index: parseInt(String(item.correctAnswerIndex || 1)), 
                     subject: target.subject, 
                     difficulty: 'PSC Level',
@@ -315,10 +305,32 @@ export async function generateFlashCards(batchSize: number = 5) {
 }
 
 export async function runDailyUpdateScrapers() {
-    await Promise.all([scrapeKpscNotifications(), scrapePscLiveUpdates(), scrapeCurrentAffairs(), scrapeGkFacts()]);
+    if (!supabase) return { message: "Supabase not initialized." };
+    const { data: settings } = await supabase.from('settings').select('key, value');
+    const getSetting = (key: string, def: boolean) => {
+        const s = settings?.find(x => x.key === key);
+        if (!s) return def;
+        return s.value === 'true';
+    };
+
+    const runNews = getSetting('auto_update_news', true);
+    const runCA = getSetting('auto_update_ca', true);
+    const runGK = getSetting('auto_update_gk', true);
+    const runAI = getSetting('auto_update_ai_gaps', false); // Default false to save costs
+    const runFlash = getSetting('auto_update_flashcards', true);
+
+    const tasks: Promise<any>[] = [];
+    if (runNews) {
+        tasks.push(scrapeKpscNotifications());
+        tasks.push(scrapePscLiveUpdates());
+    }
+    if (runCA) tasks.push(scrapeCurrentAffairs());
+    if (runGK) tasks.push(scrapeGkFacts());
+    
+    await Promise.all(tasks);
     
     // Fetch top 5 topics with gaps and generate 5 questions for each
-    if (supabase) {
+    if (supabase && runAI) {
         try {
             const { data: sData } = await supabase.from('syllabus').select('topic, title');
             const qData = await fetchAllSupabaseData('questionbank', 'topic, subject');
@@ -362,7 +374,7 @@ export async function runDailyUpdateScrapers() {
         }
     }
 
-    await generateFlashCards(3);
+    if (runFlash) await generateFlashCards(3);
     return { message: "Daily Update Routine Finished." };
 }
 
@@ -816,7 +828,7 @@ export async function syncAllFromSheetsToSupabase() {
     const tables = [
         { sheet: 'Exams', supabase: 'exams', map: (r: any[]) => ({ id: r[0], title_ml: r[1], title_en: r[2], description_ml: r[3], description_en: r[4], category: r[5], level: r[6], icon_type: r[7] }) },
         { sheet: 'Syllabus', supabase: 'syllabus', map: (r: any[]) => ({ id: r[0], exam_id: r[1], title: r[2], questions: parseInt(r[3] || '0'), duration: parseInt(r[4] || '0'), subject: r[5], topic: r[6] }) },
-        { sheet: 'QuestionBank', supabase: 'questionbank', map: (r: any[]) => ({ id: parseInt(r[0]), topic: r[1], question: r[2], options: ensureArray(r[3]), correct_answer_index: parseInt(r[4] || '1'), subject: r[5], difficulty: r[6], explanation: r[7] }) }
+        { sheet: 'QuestionBank', supabase: 'questionbank', map: (r: any[]) => ({ id: parseInt(r[0]), topic: r[1], question: r[2], options: smartParseOptions(r[3]), correct_answer_index: parseInt(r[4] || '1'), subject: r[5], difficulty: r[6], explanation: r[7] }) }
     ];
     for (const t of tables) {
         const rows = await readSheetData(`${t.sheet}!A2:Z`);

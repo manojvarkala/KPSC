@@ -1,47 +1,7 @@
 
 import { readSheetData } from './_lib/sheets-service.js';
 import { supabase, upsertSupabaseData, fetchAllSupabaseData } from './_lib/supabase-service.js';
-import { normalizeSubject } from './_lib/utils.js';
-
-/**
- * Enhanced option parser that unwraps multiple layers of stringification.
- */
-const smartParseOptions = (raw: any): string[] => {
-    if (!raw) return [];
-    
-    const unwrap = (val: any): any => {
-        if (Array.isArray(val)) {
-            if (val.length === 1 && typeof val[0] === 'string' && val[0].startsWith('[')) {
-                return unwrap(val[0]);
-            }
-            return val;
-        }
-        if (typeof val === 'string') {
-            const trimmed = val.trim();
-            if (trimmed.startsWith('[') || trimmed.startsWith('"[')) {
-                try {
-                    let cleaned = trimmed;
-                    if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
-                        cleaned = cleaned.slice(1, -1).replace(/\\"/g, '"');
-                    }
-                    const parsed = JSON.parse(cleaned);
-                    return unwrap(parsed);
-                } catch (e) {
-                    return trimmed;
-                }
-            }
-        }
-        return val;
-    };
-
-    const final = unwrap(raw);
-    if (Array.isArray(final)) return final.map(String);
-    if (typeof final === 'string') {
-        if (final.includes('|')) return final.split('|').map(s => s.trim());
-        return [final];
-    }
-    return [];
-};
+import { normalizeSubject, smartParseOptions } from './_lib/utils.js';
 
 /**
  * Shuffles an array in place using Fisher-Yates algorithm

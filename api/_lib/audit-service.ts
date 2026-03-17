@@ -3,6 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { findAndUpsertRow } from './sheets-service.js';
 import { supabase, upsertSupabaseData } from './supabase-service.js';
 import { APPROVED_SUBJECTS, APPROVED_TOPICS } from './scraper-service.js';
+import { smartParseOptions } from './utils.js';
 
 declare var process: any;
 
@@ -11,17 +12,6 @@ function getAi() {
     if (!key || key.trim() === "") throw new Error("API_KEY missing.");
     return new GoogleGenAI({ apiKey: key.trim() });
 }
-
-const ensureArray = (raw: any): string[] => {
-    if (!raw) return [];
-    if (Array.isArray(raw)) return raw.map(String);
-    try {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.map(String) : [String(raw)];
-    } catch {
-        return [String(raw)];
-    }
-};
 
 /**
  * CORE AUDIT LOGIC: Sequential batch processing by ID
