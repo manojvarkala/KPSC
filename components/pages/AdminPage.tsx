@@ -56,6 +56,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [status, setStatus] = useState<string | null>(null);
     const [isError, setIsError] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [isProcessingAll, setIsProcessingAll] = useState(false);
     const [subscriptions, setSubscriptions] = useState<any[]>([]);
     const [selectedExamId, setSelectedExamId] = useState('');
     const [syllabusItems, setSyllabusItems] = useState<PracticeTest[]>([]);
@@ -156,13 +157,65 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         } catch(e:any) { setStatus(e.message); setIsError(true); }
     };
 
+    const handleProcessAll = async (action: 'run-topic-repair' | 'normalize-topics') => {
+        if (isProcessingAll) return;
+        setIsProcessingAll(true);
+        setStatus(`Starting automated ${action === 'run-topic-repair' ? 'Repair' : 'Normalization'}...`);
+        setIsError(false);
+        
+        let continueLoop = true;
+        let batchesDone = 0;
+        
+        while (continueLoop) {
+            try {
+                const res = await adminOp(action);
+                batchesDone++;
+                setStatus(`${res.message} (Batch ${batchesDone} completed)`);
+                
+                if (res.message.includes("No pending") || res.message.includes("failed") || res.message.includes("No questions")) {
+                    continueLoop = false;
+                } else {
+                    // Wait 3 seconds between batches to prevent server hang
+                    await new Promise(r => setTimeout(r, 3000));
+                    
+                    // Refresh report to check remaining
+                    const report = await adminOp('get-audit-report');
+                    setAuditReport(report);
+                    const remaining = action === 'run-topic-repair' ? report.repairTodoCount : report.normalizationTodoCount;
+                    
+                    if (!remaining || remaining <= 0) {
+                        continueLoop = false;
+                        setStatus(`Automated ${action === 'run-topic-repair' ? 'Repair' : 'Normalization'} finished. All questions processed.`);
+                    }
+                }
+            } catch (err: any) {
+                setStatus(`Error during automated process: ${err.message}`);
+                setIsError(true);
+                continueLoop = false;
+            }
+        }
+        setIsProcessingAll(false);
+        await refreshData(true);
+    };
+
     const ToolCard = ({ title, icon: Icon, action, color, desc }: any) => (
         <div className={`p-8 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden group ${color}`}>
             <div className="absolute right-0 top-0 opacity-10 group-hover:scale-110 transition-transform -mr-10 -mt-10"><Icon className="h-48 w-48" /></div>
             <div className="relative z-10">
                 <h3 className="text-xl font-black uppercase tracking-tighter">{title}</h3>
                 <p className="text-white/70 font-bold mt-2 text-[10px] leading-relaxed max-w-[80%]">{desc}</p>
-                <button onClick={() => handleAction(action)} className="mt-6 bg-white text-slate-900 px-6 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-xl hover:scale-105 transition-all">Run Now</button>
+                <div className="flex gap-2 mt-6">
+                    <button onClick={() => handleAction(action)} disabled={isProcessingAll} className="bg-white text-slate-900 px-6 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-xl hover:scale-105 transition-all disabled:opacity-50">Run Now</button>
+                    {(action === 'run-topic-repair' || action === 'normalize-topics') && (
+                        <button 
+                            onClick={() => handleProcessAll(action as any)} 
+                            disabled={isProcessingAll}
+                            className="bg-black/20 text-white border border-white/20 px-6 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-xl hover:bg-black/40 transition-all disabled:opacity-50"
+                        >
+                            {isProcessingAll ? 'Processing...' : 'Process All'}
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );
@@ -240,12 +293,12 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                 <ToolCard title="Push to Sheets" icon={CloudArrowUpIcon} action="sync-to-sheets" color="bg-orange-600" desc="Backup Supabase data back to Google Sheets (Emergency Use)." />
                                 <ToolCard title="PSC Daily Sync" icon={SparklesIcon} action="run-daily-sync" color="bg-indigo-600" desc="Full cycle sync: Jobs, Live Updates, CA, GK and Gap Filler." />
                                 <ToolCard title="Language Repair" icon={LanguageIcon} action="run-language-repair" color="bg-cyan-600" desc="Fixes questions that were accidentally translated to Malayalam instead of English." />
-                                <ToolCard title="Topic Repair" icon={TagIcon} action="run-topic-repair" color="bg-violet-600" desc={`AI analysis to fill blank topics and subjects. ${auditReport ? `(${(auditReport.questionSubjectMismatches || 0) + (auditReport.unclassifiedCount || 0)} pending)` : ''}`} />
+                                <ToolCard title="Topic Repair" icon={TagIcon} action="run-topic-repair" color="bg-violet-600" desc={`AI analysis to fill blank topics and fix subject mismatches. ${auditReport?.repairTodoCount ? `(${auditReport.repairTodoCount} pending)` : ''}`} />
                                 <ToolCard title="AI Explanations" icon={SparklesIcon} action="run-explanation-repair" color="bg-emerald-600" desc="AI generation of missing explanations for questions in the database." />
                                 <ToolCard title="Book Store Sync" icon={BookOpenIcon} action="run-book-scraper" color="bg-slate-800" desc="Updates bookstore with top Amazon PSC guides." />
                                 <ToolCard title="GK Fact Scraper" icon={LightBulbIcon} action="run-gk-scraper" color="bg-amber-500" desc="Generates unique study facts for the daily widget." />
                                 <ToolCard title="Flashcard Generator" icon={SparklesIcon} action="run-flashcard-generator" color="bg-rose-600" desc="AI generation of high-quality Malayalam flashcards with explanations." />
-                                <ToolCard title="Topic Normalization" icon={TagIcon} action="normalize-topics" color="bg-blue-600" desc={`Maps non-syllabus topics to approved syllabus topics. ${auditReport?.normalizationTodoCount ? `(${auditReport.normalizationTodoCount} pending. Processes 100/batch)` : '(Processes 100/batch)'}`} />
+                                <ToolCard title="Topic Normalization" icon={TagIcon} action="normalize-topics" color="bg-blue-600" desc={`Maps existing non-syllabus topics to approved syllabus topics. ${auditReport?.normalizationTodoCount ? `(${auditReport.normalizationTodoCount} pending)` : ''}`} />
                             </div>
                         )}
 
@@ -267,7 +320,12 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                             <p className="text-5xl font-black text-rose-700 dark:text-rose-300">{auditReport?.repairTodoCount || 0}</p>
                                             <p className="text-xs font-bold text-rose-500 mt-2">Questions needing Topic/Subject repair</p>
                                         </div>
-                                        <button onClick={() => handleAction('run-topic-repair')} className="mt-6 w-full bg-rose-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-rose-700 transition-all text-[10px] uppercase tracking-widest">Repair Batch (100)</button>
+                                        <div className="flex flex-col gap-2 mt-6">
+                                            <button onClick={() => handleAction('run-topic-repair')} disabled={isProcessingAll} className="w-full bg-rose-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-rose-700 transition-all text-[10px] uppercase tracking-widest disabled:opacity-50">Repair Batch (100)</button>
+                                            <button onClick={() => handleProcessAll('run-topic-repair')} disabled={isProcessingAll} className="w-full bg-rose-900 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-rose-950 transition-all text-[10px] uppercase tracking-widest disabled:opacity-50">
+                                                {isProcessingAll ? 'Processing...' : 'Repair All (Auto)'}
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div className="bg-indigo-50 dark:bg-indigo-900/20 p-8 rounded-[2.5rem] border-2 border-indigo-100 dark:border-indigo-800 shadow-xl flex flex-col justify-between">
@@ -281,9 +339,9 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     
                                     <div className="bg-emerald-50 dark:bg-emerald-900/20 p-8 rounded-[2.5rem] border-2 border-emerald-100 dark:border-emerald-800 shadow-xl flex flex-col justify-between">
                                         <div>
-                                            <h4 className="text-[10px] font-black uppercase text-emerald-600 tracking-widest mb-2">Total Topics</h4>
+                                            <h4 className="text-[10px] font-black uppercase text-emerald-600 tracking-widest mb-2">Verified Topics</h4>
                                             <p className="text-5xl font-black text-emerald-700 dark:text-emerald-300">{auditReport?.syllabusReport.length || 0}</p>
-                                            <p className="text-xs font-bold text-emerald-500 mt-2">Verified micro-topics in syllabus</p>
+                                            <p className="text-xs font-bold text-emerald-500 mt-2">Unique micro-topics in syllabus</p>
                                         </div>
                                         <button onClick={() => refreshData()} className="mt-6 w-full bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-emerald-700 transition-all text-[10px] uppercase tracking-widest">Refresh Report</button>
                                     </div>

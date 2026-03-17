@@ -284,11 +284,11 @@ export default async function handler(req: any, res: any) {
                         }
 
                         // Populate TODO lists
-                        // 1. If topic is missing or not in syllabus -> Normalization (needs mapping)
-                        if (tLower === '' || tLower === 'null' || !isTopicInSyllabus) {
+                        // 1. If topic exists but is not in syllabus -> Normalization (needs mapping)
+                        if (tLower !== '' && tLower !== 'null' && !isTopicInSyllabus) {
                             normalizationTodoIds.push(q.id);
                         } 
-                        // 2. If topic is valid but subject is wrong (mismatch or not approved) -> Repair
+                        // 2. If topic is missing OR is valid but subject is wrong -> Repair
                         else {
                             repairTodoIds.push(q.id);
                         }
