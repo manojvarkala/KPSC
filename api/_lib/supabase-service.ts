@@ -29,8 +29,11 @@ export async function upsertSupabaseData(table: string, data: any[], onConflict:
         }
 
         // Mandatory field protection (avoid null value violation)
-        if (cleanTable === 'settings' && entry.value === undefined || entry.value === null) {
+        if (cleanTable === 'settings' && (entry.value === undefined || entry.value === null)) {
             entry.value = '';
+        }
+        if (cleanTable === 'syllabus' && (entry.title === undefined || entry.title === null)) {
+            entry.title = entry.topic || 'General Topic';
         }
 
         // Numeric field sanitization

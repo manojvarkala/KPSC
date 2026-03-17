@@ -232,7 +232,7 @@ export default async function handler(req: any, res: any) {
 
             case 'reconfigure-syllabus': {
                 if (!supabase) throw new Error("Supabase required.");
-                const { data: syllabus } = await supabase.from('syllabus').select('id, exam_id, questions, duration');
+                const { data: syllabus } = await supabase.from('syllabus').select('id, exam_id, questions, duration, title, topic, subject');
                 const { data: exams } = await supabase.from('exams').select('id, title_en, level');
                 
                 if (!syllabus || syllabus.length === 0) return res.status(200).json({ message: "No syllabus entries found." });
@@ -250,6 +250,10 @@ export default async function handler(req: any, res: any) {
                         
                         updates.push({
                             id: entry.id,
+                            exam_id: entry.exam_id,
+                            title: entry.title || entry.topic || 'General Topic',
+                            topic: entry.topic || entry.title || 'General Topic',
+                            subject: entry.subject || 'General Knowledge',
                             questions: 10,
                             duration: isMains ? 12 : 9
                         });
