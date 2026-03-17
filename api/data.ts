@@ -134,23 +134,25 @@ export default async function handler(req: any, res: any) {
         else limitCount = 20;
     }
 
+    const cleanTopic = String(topic || '').trim();
+    const cleanSubject = String(subject || '').trim();
+
     try {
         if (supabase) {
             let query = supabase.from(tableName).select('*');
             if (tableName === 'syllabus' && examId) query = query.eq('exam_id', String(examId));
             let fetchLimit = limitCount;
             if (tableName === 'questionbank') {
-                if (topic && topic !== 'mixed') {
-                    // Stricter matching: Exact (case-insensitive) match on Topic
-                    query = query.ilike('topic', topic);
+                if (cleanTopic && cleanTopic.toLowerCase() !== 'mixed') {
+                    // Use a more lenient match to handle trailing spaces in DB
+                    query = query.ilike('topic', cleanTopic);
                     
-                    // If subject is also provided, filter by it too
-                    if (subject && subject !== 'mixed' && subject !== 'General') {
-                        query = query.ilike('subject', subject);
+                    if (cleanSubject && cleanSubject.toLowerCase() !== 'mixed' && cleanSubject.toLowerCase() !== 'general') {
+                        query = query.ilike('subject', cleanSubject);
                     }
                     fetchLimit = 100; 
-                } else if (subject && subject !== 'mixed' && subject !== 'General') {
-                    query = query.ilike('subject', `%${subject}%`);
+                } else if (cleanSubject && cleanSubject.toLowerCase() !== 'mixed' && cleanSubject.toLowerCase() !== 'general') {
+                    query = query.ilike('subject', `%${cleanSubject}%`);
                 }
             }
             

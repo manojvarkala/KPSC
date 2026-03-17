@@ -348,14 +348,21 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
                                     <div className="bg-blue-50 dark:bg-blue-900/20 p-8 rounded-[2.5rem] border-2 border-blue-100 dark:border-blue-800 shadow-xl flex flex-col justify-between">
                                         <div>
-                                            <h4 className="text-[10px] font-black uppercase text-blue-600 tracking-widest mb-2">Database Stats</h4>
+                                            <h4 className="text-[10px] font-black uppercase text-blue-600 tracking-widest mb-2">Database Health</h4>
                                             <p className="text-5xl font-black text-blue-700 dark:text-blue-300">{totalQuestions}</p>
                                             <p className="text-xs font-bold text-blue-500 mt-2">Total questions in database</p>
+                                            <div className="mt-4 space-y-1">
+                                                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                                                    <span className="text-emerald-600">Verified:</span>
+                                                    <span className="text-emerald-700">{auditReport?.classifiedCount || 0}</span>
+                                                </div>
+                                                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                                                    <span className="text-rose-600">Unclassified:</span>
+                                                    <span className="text-rose-700">{auditReport?.unclassifiedCount || 0}</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="mt-6 flex items-center justify-between bg-blue-100 dark:bg-blue-800/50 rounded-2xl p-4">
-                                            <span className="text-[9px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-300">Classified: {totalClassified}</span>
-                                            <span className="text-[9px] font-black uppercase tracking-widest text-blue-400">Unclassified: {totalUnclassified}</span>
-                                        </div>
+                                        <button onClick={() => handleAction('clean-database')} className="mt-6 w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-blue-700 transition-all text-[10px] uppercase tracking-widest">Clean Whitespace</button>
                                     </div>
                                 </div>
 

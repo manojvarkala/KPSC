@@ -137,11 +137,18 @@ export async function generateQuestionsForGaps(batchSizeOrTopic: number | string
     if (!supabase) throw new Error("Supabase required.");
     let targetMappings: { topic: string, subject: string }[] = [];
 
-    if (typeof batchSizeOrTopic === 'string') {
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(batchSizeOrTopic);
-        const queryOr = isUUID ? `id.eq.${batchSizeOrTopic}` : `topic.ilike.%${batchSizeOrTopic}%,title.ilike.%${batchSizeOrTopic}%`;
+    if (typeof batchSizeOrTopic === 'string' || typeof batchSizeOrTopic === 'number') {
+        const isUUID = typeof batchSizeOrTopic === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(batchSizeOrTopic);
+        const isNumericId = typeof batchSizeOrTopic === 'number' || (typeof batchSizeOrTopic === 'string' && /^\d+$/.test(batchSizeOrTopic));
         
-        const { data: mappings } = await supabase.from('syllabus').select('topic, subject, title, id').or(queryOr).limit(1);
+        let query;
+        if (isUUID || isNumericId) {
+            query = supabase.from('syllabus').select('topic, subject, title, id').eq('id', batchSizeOrTopic);
+        } else {
+            query = supabase.from('syllabus').select('topic, subject, title, id').or(`topic.ilike.%${batchSizeOrTopic}%,title.ilike.%${batchSizeOrTopic}%`);
+        }
+        
+        const { data: mappings } = await query.limit(1);
         if (mappings?.[0]) {
             let t = mappings[0].topic;
             if (!t || String(t).toLowerCase() === 'null' || String(t).trim() === '') t = mappings[0].title;

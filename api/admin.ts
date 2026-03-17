@@ -161,9 +161,29 @@ export default async function handler(req: any, res: any) {
                 return res.status(200).json({ message: `${sheet} entry updated.` });
             }
 
+            case 'clean-database': {
+                if (!supabase) throw new Error("Supabase required.");
+                const qData = await fetchAllSupabaseData('questionbank', 'id, topic, subject');
+                let cleanedCount = 0;
+                const toUpdate = qData.filter(q => {
+                    const t = String(q.topic || '');
+                    const s = String(q.subject || '');
+                    return t !== t.trim() || s !== s.trim();
+                });
+
+                for (const q of toUpdate) {
+                    await supabase.from('questionbank').update({
+                        topic: String(q.topic || '').trim(),
+                        subject: String(q.subject || '').trim()
+                    }).eq('id', q.id);
+                    cleanedCount++;
+                }
+                return res.json({ success: true, message: `Cleaned whitespace from ${cleanedCount} questions.` });
+            }
+
             case 'run-all-gaps': {
                 if (!supabase) throw new Error("Supabase required.");
-                const { data: sData } = await supabase.from('syllabus').select('topic, title');
+                const { data: sData } = await supabase.from('syllabus').select('id, topic, title, subject');
                 const qData = await fetchAllSupabaseData('questionbank', 'topic, subject');
                 
                 const uniqueTopics = new Set<string>();
@@ -173,34 +193,34 @@ export default async function handler(req: any, res: any) {
                     if (!t || t === 'null' || t.trim() === '') t = "Unnamed Topic";
                     
                     const sTopic = String(t).toLowerCase().trim();
-                    const sTopicWords = sTopic.split(/[\s,.-]+/).filter(w => w.length > 2);
+                    const sSubject = String(s.subject || '').toLowerCase().trim();
+                    const compositeKey = `${sSubject}|${sTopic}`;
                     
+                    // Strict matching: Must match BOTH subject and topic exactly
                     const count = qData?.filter(q => {
                         const qTopic = String(q.topic || '').toLowerCase().trim();
                         const qSubject = String(q.subject || '').toLowerCase().trim();
-                        
-                        if (qTopic === sTopic) return true;
-                        if (qTopic === '' && qSubject === sTopic) return true;
-                        if (sTopicWords.length > 0) {
-                            const qText = `${qTopic} ${qSubject}`;
-                            let score = 0;
-                            sTopicWords.forEach(w => { if (qText.includes(w)) score++; });
-                            if (score >= Math.ceil(sTopicWords.length / 2)) return true;
-                        }
-                        return false;
+                        return qTopic === sTopic && qSubject === sSubject;
                     }).length || 0;
 
-                    return { topic: t, sTopic, count };
+                    return { id: s.id, topic: t, compositeKey, count };
                 }).filter(s => {
-                    if (uniqueTopics.has(s.sTopic)) return false;
-                    uniqueTopics.add(s.sTopic);
+                    if (uniqueTopics.has(s.compositeKey)) return false;
+                    uniqueTopics.add(s.compositeKey);
                     return true;
                 }).sort((a, b) => a.count - b.count);
 
                 if (sortedTopics.length === 0) return res.status(200).json({ message: "No topics found in syllabus." });
                 
-                const batch = sortedTopics.slice(0, 5).map(s => s.topic);
-                for (const t of batch) { try { await generateQuestionsForGaps(t); } catch (err) {} }
+                const batch = sortedTopics.slice(0, 5);
+                for (const item of batch) { 
+                    try { 
+                        // Pass the specific syllabus ID to ensure correct subject/topic targeting
+                        await generateQuestionsForGaps(item.id); 
+                    } catch (err) {
+                        console.error(`Gap fill failed for ${item.topic}:`, err);
+                    } 
+                }
                 return res.status(200).json({ message: `Filled gaps for ${batch.length} topics.` });
             }
 
@@ -253,6 +273,7 @@ export default async function handler(req: any, res: any) {
                 const unapprovedTopics: string[] = [];
                 let questionSubjectMismatches = 0;
                 let unclassifiedCount = 0;
+                let classifiedCount = 0;
 
                 qData?.forEach(q => { 
                     const s = String(q.subject || '').trim();
@@ -292,6 +313,8 @@ export default async function handler(req: any, res: any) {
                         else {
                             repairTodoIds.push(q.id);
                         }
+                    } else {
+                        classifiedCount++;
                     }
                 });
 
@@ -349,6 +372,7 @@ export default async function handler(req: any, res: any) {
                     syllabusReport: gapReport.sort((a, b) => a.count - b.count), 
                     totalQuestions,
                     unclassifiedCount,
+                    classifiedCount,
                     normalizationTodoCount: normalizationTodoIds.length,
                     repairTodoCount: repairTodoIds.length,
                     questionSubjectMismatches,
