@@ -184,7 +184,7 @@ export default async function handler(req: any, res: any) {
 
             case 'rebuild-syllabus': {
                 if (!supabase) throw new Error("Supabase required.");
-                const { data: exams } = await supabase.from('exams').select('id');
+                const { data: exams } = await supabase.from('exams').select('id, title_en, level');
                 if (!exams || exams.length === 0) return res.status(200).json({ message: "No exams found to rebuild syllabus for." });
 
                 const syllabusEntries: any[] = [];
@@ -202,14 +202,23 @@ export default async function handler(req: any, res: any) {
                 ];
 
                 for (const exam of exams) {
+                    const title = String(exam.title_en || '').toLowerCase();
+                    const level = String(exam.level || '').toLowerCase();
+                    const isMains = title.includes('mains') || title.includes('main') || level.includes('main');
+                    
+                    // Standard PSC: Prelims = 100 Qs / 75-90 Mins, Mains = 100 Qs / 90-120 Mins
+                    // With 10 topics, we distribute them:
+                    const qPerTopic = 10; 
+                    const dPerTopic = isMains ? 12 : 9; // 120 mins total for mains, 90 mins for prelims
+
                     for (const t of topics) {
                         syllabusEntries.push({
                             exam_id: exam.id,
                             topic: t.topic,
                             title: t.topic,
                             subject: t.subject,
-                            questions: 20,
-                            duration: 15
+                            questions: qPerTopic,
+                            duration: dPerTopic
                         });
                     }
                 }
@@ -218,7 +227,43 @@ export default async function handler(req: any, res: any) {
                 for (let i = 0; i < syllabusEntries.length; i += 50) {
                     await upsertSupabaseData('syllabus', syllabusEntries.slice(i, i + 50), 'id');
                 }
-                return res.status(200).json({ message: `Rebuilt syllabus with ${syllabusEntries.length} entries.` });
+                return res.status(200).json({ message: `Rebuilt syllabus with ${syllabusEntries.length} entries with exam-specific configs.` });
+            }
+
+            case 'reconfigure-syllabus': {
+                if (!supabase) throw new Error("Supabase required.");
+                const { data: syllabus } = await supabase.from('syllabus').select('id, exam_id, questions, duration');
+                const { data: exams } = await supabase.from('exams').select('id, title_en, level');
+                
+                if (!syllabus || syllabus.length === 0) return res.status(200).json({ message: "No syllabus entries found." });
+
+                const examMap = new Map(exams?.map(e => [e.id, { title: e.title_en, level: e.level }]) || []);
+                const updates: any[] = [];
+
+                for (const entry of syllabus) {
+                    // Only update if questions or duration are 0
+                    if (entry.questions === 0 || entry.duration === 0) {
+                        const examInfo = examMap.get(entry.exam_id);
+                        const examTitle = String(examInfo?.title || '').toLowerCase();
+                        const examLevel = String(examInfo?.level || '').toLowerCase();
+                        const isMains = examTitle.includes('mains') || examTitle.includes('main') || examLevel.includes('main');
+                        
+                        updates.push({
+                            id: entry.id,
+                            questions: 10,
+                            duration: isMains ? 12 : 9
+                        });
+                    }
+                }
+
+                if (updates.length > 0) {
+                    for (let i = 0; i < updates.length; i += 50) {
+                        await upsertSupabaseData('syllabus', updates.slice(i, i + 50), 'id');
+                    }
+                    return res.status(200).json({ message: `Reconfigured ${updates.length} syllabus entries with proper question counts and durations.` });
+                }
+
+                return res.status(200).json({ message: "All syllabus entries already have valid configurations." });
             }
 
             case 'normalize-subjects': {

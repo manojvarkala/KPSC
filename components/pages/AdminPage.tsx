@@ -301,6 +301,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                 <ToolCard title="Topic Normalization" icon={TagIcon} action="normalize-topics" color="bg-blue-600" desc={`Maps existing non-syllabus topics to approved syllabus topics. ${auditReport?.normalizationTodoCount ? `(${auditReport.normalizationTodoCount} pending)` : ''}`} />
                                 <ToolCard title="Database Cleanup" icon={SparklesIcon} action="clean-database" color="bg-slate-700" desc="Removes trailing whitespace from all topics and subjects in the database to fix matching issues." />
                                 <ToolCard title="Rebuild Syllabus" icon={PlusIcon} action="rebuild-syllabus" color="bg-amber-600" desc="Populates the syllabus table with standard PSC topics for all exams. Use this if exams show zero micro-topics." />
+                                <ToolCard title="Reconfigure Syllabus" icon={Cog6ToothIcon} action="reconfigure-syllabus" color="bg-indigo-700" desc="Fixes existing syllabus entries that have 0 questions or 0 duration. Adjusts based on Prelims/Mains type." />
                                 <ToolCard title="Normalize Subjects" icon={ShieldCheckIcon} action="normalize-subjects" color="bg-teal-600" desc="Standardizes subject names in the question bank to match the approved list (e.g. 'Kerala History' instead of 'History of Kerala')." />
                             </div>
                         )}
