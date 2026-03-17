@@ -10,6 +10,7 @@ import {
     scrapeCurrentAffairs,
     generateQuestionsForGaps,
     generateFlashCards,
+    generateSyllabusForExam,
     syncAllFromSheetsToSupabase,
     syncSupabaseToSheets,
     repairLanguageMismatches,
@@ -152,6 +153,12 @@ export default async function handler(req: any, res: any) {
             case 'save-row': {
                 const tableName = sheet.toLowerCase();
                 if (supabase) await upsertSupabaseData(tableName, [rowData]);
+                
+                // Automatically generate syllabus for new exams
+                if (tableName === 'exams') {
+                    await generateSyllabusForExam(rowData);
+                }
+
                 let sheetValues: any[] = [];
                 if (tableName === 'exams') {
                     sheetValues = [rowData.id, rowData.title_ml, rowData.title_en, rowData.description_ml, rowData.description_en, rowData.category, rowData.level, rowData.icon_type];
@@ -187,47 +194,11 @@ export default async function handler(req: any, res: any) {
                 const { data: exams } = await supabase.from('exams').select('id, title_en, level');
                 if (!exams || exams.length === 0) return res.status(200).json({ message: "No exams found to rebuild syllabus for." });
 
-                const syllabusEntries: any[] = [];
-                const topics = [
-                    { topic: 'General Knowledge', subject: 'General Knowledge' },
-                    { topic: 'Kerala History & Renaissance', subject: 'Kerala History' },
-                    { topic: 'Indian Polity & Constitution', subject: 'Indian Polity / Constitution' },
-                    { topic: 'Basic Arithmetic', subject: 'Quantitative Aptitude' },
-                    { topic: 'Mental Ability & Logical Reasoning', subject: 'Reasoning / Mental Ability' },
-                    { topic: 'Basic English', subject: 'English' },
-                    { topic: 'Malayalam Language', subject: 'Malayalam' },
-                    { topic: 'General Science - Physics', subject: 'Physics' },
-                    { topic: 'General Science - Chemistry', subject: 'Chemistry' },
-                    { topic: 'General Science - Biology & Public Health', subject: 'Biology / Life Science' }
-                ];
-
                 for (const exam of exams) {
-                    const title = String(exam.title_en || '').toLowerCase();
-                    const level = String(exam.level || '').toLowerCase();
-                    const isMains = title.includes('mains') || title.includes('main') || level.includes('main');
-                    
-                    // Standard PSC: Prelims = 100 Qs / 75-90 Mins, Mains = 100 Qs / 90-120 Mins
-                    // With 10 topics, we distribute them:
-                    const qPerTopic = 10; 
-                    const dPerTopic = isMains ? 12 : 9; // 120 mins total for mains, 90 mins for prelims
-
-                    for (const t of topics) {
-                        syllabusEntries.push({
-                            exam_id: exam.id,
-                            topic: t.topic,
-                            title: t.topic,
-                            subject: t.subject,
-                            questions: qPerTopic,
-                            duration: dPerTopic
-                        });
-                    }
+                    await generateSyllabusForExam(exam);
                 }
 
-                // Use a loop to insert to avoid potential payload size issues
-                for (let i = 0; i < syllabusEntries.length; i += 50) {
-                    await upsertSupabaseData('syllabus', syllabusEntries.slice(i, i + 50), 'id');
-                }
-                return res.status(200).json({ message: `Rebuilt syllabus with ${syllabusEntries.length} entries with exam-specific configs.` });
+                return res.status(200).json({ message: `Rebuilt syllabus for ${exams.length} exams with standard PSC topics.` });
             }
 
             case 'reconfigure-syllabus': {

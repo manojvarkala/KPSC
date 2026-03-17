@@ -378,6 +378,44 @@ export async function runDailyUpdateScrapers() {
     return { message: "Daily Update Routine Finished." };
 }
 
+export async function generateSyllabusForExam(exam: { id: string, title_en: string, level: string }) {
+    if (!supabase) return;
+    
+    const topics = [
+        { topic: 'General Knowledge', subject: 'General Knowledge' },
+        { topic: 'Kerala History & Renaissance', subject: 'Kerala History' },
+        { topic: 'Indian Polity & Constitution', subject: 'Indian Polity / Constitution' },
+        { topic: 'Basic Arithmetic', subject: 'Quantitative Aptitude' },
+        { topic: 'Mental Ability & Logical Reasoning', subject: 'Reasoning / Mental Ability' },
+        { topic: 'Basic English', subject: 'English' },
+        { topic: 'Malayalam Language', subject: 'Malayalam' },
+        { topic: 'General Science - Physics', subject: 'Physics' },
+        { topic: 'General Science - Chemistry', subject: 'Chemistry' },
+        { topic: 'General Science - Biology & Public Health', subject: 'Biology / Life Science' }
+    ];
+
+    const title = String(exam.title_en || '').toLowerCase();
+    const level = String(exam.level || '').toLowerCase();
+    const isMains = title.includes('mains') || title.includes('main') || level.includes('main');
+    
+    const qPerTopic = 10; 
+    const dPerTopic = isMains ? 12 : 9;
+
+    const syllabusEntries = topics.map(t => ({
+        exam_id: exam.id,
+        topic: t.topic,
+        title: t.topic,
+        subject: t.subject,
+        questions: qPerTopic,
+        duration: dPerTopic
+    }));
+
+    // Use a loop to insert to avoid potential payload size issues
+    for (let i = 0; i < syllabusEntries.length; i += 50) {
+        await upsertSupabaseData('syllabus', syllabusEntries.slice(i, i + 50), 'id');
+    }
+}
+
 export async function scrapeGkFacts() {
     try {
         const ai = getAi();
