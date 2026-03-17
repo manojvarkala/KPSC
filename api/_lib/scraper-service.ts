@@ -30,7 +30,9 @@ export const APPROVED_SUBJECTS = [
     "Indian Economy", "Indian Geography", "Indian History", "Indian Polity / Constitution",
     "Kerala Geography", "Kerala History", "Kerala History / Renaissance", "Kerala Specific GK",
     "Malayalam", "Nursing Science / Health Care", "Physics", "Quantitative Aptitude",
-    "Reasoning / Mental Ability", "Social Science / Sociology"
+    "Reasoning / Mental Ability", "Social Science / Sociology", "Mathematics", "Botany", "Zoology",
+    "Economics", "Political Science", "Statistics", "Geography", "Sanskrit", "Kannada", "Philosophy",
+    "Psychology", "Commerce", "Physical Education", "Music", "Arabic", "Hindi"
 ];
 
 export const SYLLABUS_STRUCTURE = {
@@ -381,34 +383,89 @@ export async function runDailyUpdateScrapers() {
 export async function generateSyllabusForExam(exam: { id: string, title_en: string, level: string }) {
     if (!supabase) return;
     
-    const topics = [
-        { topic: 'General Knowledge', subject: 'General Knowledge' },
-        { topic: 'Kerala History & Renaissance', subject: 'Kerala History' },
-        { topic: 'Indian Polity & Constitution', subject: 'Indian Polity / Constitution' },
-        { topic: 'Basic Arithmetic', subject: 'Quantitative Aptitude' },
-        { topic: 'Mental Ability & Logical Reasoning', subject: 'Reasoning / Mental Ability' },
-        { topic: 'Basic English', subject: 'English' },
-        { topic: 'Malayalam Language', subject: 'Malayalam' },
-        { topic: 'General Science - Physics', subject: 'Physics' },
-        { topic: 'General Science - Chemistry', subject: 'Chemistry' },
-        { topic: 'General Science - Biology & Public Health', subject: 'Biology / Life Science' }
-    ];
-
     const title = String(exam.title_en || '').toLowerCase();
     const level = String(exam.level || '').toLowerCase();
     const isMains = title.includes('mains') || title.includes('main') || level.includes('main');
-    
-    const qPerTopic = 10; 
-    const dPerTopic = isMains ? 12 : 9;
+    const isHsst = title.includes('hsst');
+
+    let topics: any[] = [];
+
+    if (isHsst) {
+        // Find the subject from the title
+        const subjectMatch = APPROVED_SUBJECTS.find(s => title.includes(s.toLowerCase()));
+        const subject = subjectMatch || 'General Knowledge';
+        
+        let coreTopics: any[] = [];
+        
+        // Fetch distinct topics for this subject from the database
+        if (subject !== 'General Knowledge') {
+            const { data: qbData } = await supabase.from('questionbank').select('topic').eq('subject', subject);
+            if (qbData && qbData.length > 0) {
+                const uniqueTopics = Array.from(new Set(qbData.map(q => String(q.topic || '').trim()).filter(t => t && t.toLowerCase() !== 'mixed')));
+                
+                if (uniqueTopics.length > 0) {
+                    // We need to distribute 70 questions among uniqueTopics.
+                    // If there are more topics than 70, just take the first 70 topics.
+                    const selectedTopics = uniqueTopics.slice(0, 70);
+                    const qPerTopic = Math.max(1, Math.floor(70 / selectedTopics.length));
+                    const dPerTopic = Math.max(1, Math.floor(80 / selectedTopics.length));
+                    
+                    let totalQ = 0;
+                    selectedTopics.forEach((ut, idx) => {
+                        const isLast = idx === selectedTopics.length - 1;
+                        const qCount = isLast ? (70 - totalQ) : qPerTopic;
+                        totalQ += qCount;
+                        
+                        coreTopics.push({
+                            topic: ut,
+                            subject: subject,
+                            questions: qCount,
+                            duration: dPerTopic
+                        });
+                    });
+                }
+            }
+        }
+        
+        // Fallback if no specific topics found
+        if (coreTopics.length === 0) {
+            coreTopics = [{ topic: `${subject} (Core Subject)`, subject: subject, questions: 70, duration: 80 }];
+        }
+        
+        topics = [
+            ...coreTopics,
+            { topic: 'Research Methodology & Teaching Aptitude', subject: 'Educational Psychology / Pedagogy', questions: 10, duration: 15 },
+            { topic: 'General Knowledge & Current Affairs', subject: 'General Knowledge', questions: 10, duration: 15 },
+            { topic: 'Indian Constitution & Social Welfare', subject: 'Indian Polity / Constitution', questions: 10, duration: 10 }
+        ];
+    } else {
+        const qPerTopic = 10; 
+        const dPerTopic = isMains ? 12 : 9;
+        topics = [
+            { topic: 'General Knowledge', subject: 'General Knowledge', questions: qPerTopic, duration: dPerTopic },
+            { topic: 'Kerala History & Renaissance', subject: 'Kerala History', questions: qPerTopic, duration: dPerTopic },
+            { topic: 'Indian Polity & Constitution', subject: 'Indian Polity / Constitution', questions: qPerTopic, duration: dPerTopic },
+            { topic: 'Basic Arithmetic', subject: 'Quantitative Aptitude', questions: qPerTopic, duration: dPerTopic },
+            { topic: 'Mental Ability & Logical Reasoning', subject: 'Reasoning / Mental Ability', questions: qPerTopic, duration: dPerTopic },
+            { topic: 'Basic English', subject: 'English', questions: qPerTopic, duration: dPerTopic },
+            { topic: 'Malayalam Language', subject: 'Malayalam', questions: qPerTopic, duration: dPerTopic },
+            { topic: 'General Science - Physics', subject: 'Physics', questions: qPerTopic, duration: dPerTopic },
+            { topic: 'General Science - Chemistry', subject: 'Chemistry', questions: qPerTopic, duration: dPerTopic },
+            { topic: 'General Science - Biology & Public Health', subject: 'Biology / Life Science', questions: qPerTopic, duration: dPerTopic }
+        ];
+    }
 
     const syllabusEntries = topics.map(t => ({
         exam_id: exam.id,
         topic: t.topic,
         title: t.topic,
         subject: t.subject,
-        questions: qPerTopic,
-        duration: dPerTopic
+        questions: t.questions,
+        duration: t.duration
     }));
+
+    // Delete existing syllabus for this exam to avoid duplicates
+    await supabase.from('syllabus').delete().eq('exam_id', exam.id);
 
     // Use a loop to insert to avoid potential payload size issues
     for (let i = 0; i < syllabusEntries.length; i += 50) {

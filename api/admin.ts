@@ -201,6 +201,21 @@ export default async function handler(req: any, res: any) {
                 return res.status(200).json({ message: `Rebuilt syllabus for ${exams.length} exams with standard PSC topics.` });
             }
 
+            case 'rebuild-hsst-syllabus': {
+                if (!supabase) throw new Error("Supabase required.");
+                const { data: exams } = await supabase.from('exams').select('id, title_en, level');
+                if (!exams) return res.status(400).json({ error: "No exams found" });
+                
+                const hsstExams = exams.filter(e => String(e.title_en || '').toLowerCase().includes('hsst'));
+                if (hsstExams.length === 0) return res.status(200).json({ message: "No HSST exams found to rebuild." });
+
+                for (const exam of hsstExams) {
+                    await generateSyllabusForExam(exam);
+                }
+
+                return res.status(200).json({ message: `Rebuilt syllabus for ${hsstExams.length} HSST exams with subject-specific topics.` });
+            }
+
             case 'reconfigure-syllabus': {
                 if (!supabase) throw new Error("Supabase required.");
                 const { data: syllabus } = await supabase.from('syllabus').select('id, exam_id, questions, duration, title, topic, subject');
