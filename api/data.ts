@@ -1,6 +1,7 @@
 
 import { readSheetData } from './_lib/sheets-service.js';
-import { supabase } from './_lib/supabase-service.js';
+import { supabase, upsertSupabaseData, fetchAllSupabaseData } from './_lib/supabase-service.js';
+import { normalizeSubject } from './_lib/utils.js';
 
 /**
  * Enhanced option parser that unwraps multiple layers of stringification.
@@ -40,63 +41,6 @@ const smartParseOptions = (raw: any): string[] => {
         return [final];
     }
     return [];
-};
-
-/**
- * Normalizes subject names to strictly follow the Official Approved List provided by user.
- */
-const normalizeSubject = (subject: string, topic: string, question: string = ''): string => {
-    const s = String(subject || '').toLowerCase().trim();
-    const t = String(topic || '').toLowerCase().trim();
-    const q = String(question || '').toLowerCase().trim();
-    const context = `${s} ${t} ${q}`;
-
-    // 1. Core Subject Mapping
-    if (context.includes('renaissance') || context.includes('നവോത്ഥാനം')) return "Kerala History / Renaissance";
-    if (context.includes('kerala history') || context.includes('കേരള ചരിത്രം')) return "Kerala History";
-    if (context.includes('kerala geo') || context.includes('കേരള ഭൂമിശാസ്ത്രം') || context.includes('river') || context.includes('district')) {
-        if (context.includes('kerala')) return "Kerala Geography";
-    }
-    if (context.includes('kerala gk') || context.includes('കേരള സംബന്ധിയായ') || context.includes('kerala specific')) return "Kerala Specific GK";
-    
-    if (context.includes('indian history') || context.includes('ഇന്ത്യൻ ചരിത്രം') || context.includes('freedom struggle')) return "Indian History";
-    if (context.includes('indian geo') || context.includes('ഇന്ത്യൻ ഭൂമിശാസ്ത്രം') || context.includes('himalaya') || context.includes('ganga') || context.includes('world geography')) return "Indian Geography";
-    if (context.includes('polity') || context.includes('const') || context.includes('ഭരണഘടന') || context.includes('article') || context.includes('panchayat') || context.includes('administration')) return "Indian Polity / Constitution";
-    if (context.includes('economy') || context.includes('സാമ്പത്തിക') || context.includes('gdp') || context.includes('budget')) return "Indian Economy";
-    
-    if (context.includes('biology') || context.includes('ജീവശാസ്ത്രം') || context.includes('life science') || context.includes('cell') || context.includes('human body') || context.includes('anatomy') || context.includes('physiology') || context.includes('botany') || context.includes('zoology')) return "Biology / Life Science";
-    if (context.includes('chemistry') || context.includes('രസതന്ത്രം') || context.includes('element') || context.includes('formula') || context.includes('organic') || context.includes('inorganic')) return "Chemistry";
-    if (context.includes('physics') || context.includes('ഭൗതികശാസ്ത്രം') || context.includes('motion') || context.includes('energy') || context.includes('mechanics') || context.includes('electromagnetism')) return "Physics";
-    if (context.includes('gen science') || context.includes('ശാസ്ത്രം') || context.includes('tech') || context.includes('space')) return "General Science / Science & Tech";
-    
-    if (context.includes('math') || context.includes('arithmetic') || context.includes('ഗണിതം') || context.includes('percentage') || context.includes('interest') || context.includes('algebra') || context.includes('calculus')) return "Quantitative Aptitude";
-    if (context.includes('reasoning') || context.includes('logic') || context.includes('mental') || context.includes('coding-decoding')) return "Reasoning / Mental Ability";
-    
-    if (context.includes('it') || context.includes('computer') || context.includes('cyber') || context.includes('internet') || context.includes('software')) return "Computer Science / IT / Cyber Laws";
-    if (context.includes('english') || context.includes('ഇംഗ്ലീഷ്') || context.includes('grammar') || context.includes('synonym') || context.includes('vocabulary')) return "English";
-    if (context.includes('malayalam') || context.includes('മലയാളം') || context.includes('സാഹിത്യം')) return "Malayalam";
-    
-    if (context.includes('arts') || context.includes('sports') || context.includes('culture') || context.includes('കായികം') || context.includes('award') || context.includes('film')) return "Arts, Culture & Sports";
-    if (context.includes('nursing') || context.includes('health') || context.includes('മെഡിക്കൽ') || context.includes('disease') || context.includes('pharmacology') || context.includes('sanitation')) return "Nursing Science / Health Care";
-    if (context.includes('electrical') || context.includes('എഞ്ചിനീയറിംഗ്') || context.includes('circuits') || context.includes('power systems')) return "Electrical Engineering";
-    if (context.includes('psychology') || context.includes('pedagogy') || context.includes('ബോധന') || context.includes('teaching')) return "Educational Psychology / Pedagogy";
-    if (context.includes('environment') || context.includes('പരിസ്ഥിതി') || context.includes('pollution') || context.includes('climate') || context.includes('forestry')) return "Environment";
-    if (context.includes('social science') || context.includes('sociology') || context.includes('സമൂഹ')) return "Social Science / Sociology";
-    if (context.includes('current') || context.includes('news') || context.includes('ആനുകാലികം')) return "Current Affairs";
-    
-    if (context.includes('law') || context.includes('acts') || context.includes('police') || context.includes('excise')) return "General Knowledge";
-    if (context.includes('library')) return "General Knowledge";
-
-    // 2. Static GK Fallback
-    if (context.includes('gk') || context.includes('first in') || context.includes('largest')) return "General Knowledge / Static GK";
-    
-    // 3. Blacklist Catch-all (Default to General Knowledge)
-    const blacklist = ['other', 'manual check', 'unknown', 'n/a', 'none', '', 'null', 'undefined', 'manual correction required'];
-    if (blacklist.includes(s)) {
-        return "General Knowledge";
-    }
-
-    return subject; // Return original if it doesn't match a context-fix but isn't blacklisted
 };
 
 /**
@@ -144,13 +88,13 @@ export default async function handler(req: any, res: any) {
             let fetchLimit = limitCount;
             if (tableName === 'questionbank') {
                 if (cleanTopic && cleanTopic.toLowerCase() !== 'mixed') {
-                    // Use a more lenient match to handle trailing spaces in DB
-                    query = query.ilike('topic', cleanTopic);
+                    // Use wildcards to handle variations and trailing spaces
+                    query = query.ilike('topic', `%${cleanTopic}%`);
                     
                     if (cleanSubject && cleanSubject.toLowerCase() !== 'mixed' && cleanSubject.toLowerCase() !== 'general') {
-                        query = query.ilike('subject', cleanSubject);
+                        query = query.ilike('subject', `%${cleanSubject}%`);
                     }
-                    fetchLimit = 100; 
+                    fetchLimit = 200; // Fetch more to increase chances of finding matches
                 } else if (cleanSubject && cleanSubject.toLowerCase() !== 'mixed' && cleanSubject.toLowerCase() !== 'general') {
                     query = query.ilike('subject', `%${cleanSubject}%`);
                 }
@@ -165,16 +109,25 @@ export default async function handler(req: any, res: any) {
             const { data, error } = await query;
             if (error) {
                 console.error(`Supabase Query Error [${tableName}]:`, error.message);
-                // If it's a schema cache error, we trigger the fallback to sheets
                 if (!error.message.includes('schema cache') && !error.message.includes('column')) {
                     throw error;
                 }
-                console.warn("Schema mismatch detected, falling back to Sheets.");
             }
             
-            if (!error && data && data.length > 0) {
+            let finalResult = data;
+            if (!error && (!data || data.length === 0) && tableName === 'questionbank' && cleanTopic && cleanTopic.toLowerCase() !== 'mixed') {
+                // FALLBACK: Try subject only if topic search failed
+                let fallbackQuery = supabase.from(tableName).select('*');
+                if (cleanSubject && cleanSubject.toLowerCase() !== 'mixed' && cleanSubject.toLowerCase() !== 'general') {
+                    fallbackQuery = fallbackQuery.ilike('subject', `%${cleanSubject}%`);
+                }
+                const { data: fallbackData } = await fallbackQuery.limit(fetchLimit);
+                if (fallbackData && fallbackData.length > 0) finalResult = fallbackData;
+            }
+            
+            if (!error && finalResult && finalResult.length > 0) {
                 if (tableName === 'questionbank') {
-                    const finalData = data.slice(0, limitCount);
+                    const finalData = finalResult.slice(0, limitCount);
 
                     const processedQuestions = finalData.map(q => {
                         const originalOptions = smartParseOptions(q.options);

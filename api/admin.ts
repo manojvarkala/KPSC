@@ -21,6 +21,7 @@ import {
 } from "./_lib/scraper-service.js";
 import { auditAndCorrectQuestions } from "./_lib/audit-service.js";
 import { supabase, upsertSupabaseData, deleteSupabaseRow, fetchAllSupabaseData } from "./_lib/supabase-service.js";
+import { normalizeSubject } from "./_lib/utils.js";
 
 async function getRequestBody(req: any) {
     // If body is already an object, return it (standard for many serverless platforms)
@@ -179,6 +180,65 @@ export default async function handler(req: any, res: any) {
                     cleanedCount++;
                 }
                 return res.json({ success: true, message: `Cleaned whitespace from ${cleanedCount} questions.` });
+            }
+
+            case 'rebuild-syllabus': {
+                if (!supabase) throw new Error("Supabase required.");
+                const { data: exams } = await supabase.from('exams').select('id');
+                if (!exams || exams.length === 0) return res.status(200).json({ message: "No exams found to rebuild syllabus for." });
+
+                const syllabusEntries: any[] = [];
+                const topics = [
+                    { topic: 'General Knowledge', subject: 'General Knowledge' },
+                    { topic: 'Kerala History & Renaissance', subject: 'Kerala History' },
+                    { topic: 'Indian Polity & Constitution', subject: 'Indian Polity / Constitution' },
+                    { topic: 'Basic Arithmetic', subject: 'Quantitative Aptitude' },
+                    { topic: 'Mental Ability & Logical Reasoning', subject: 'Reasoning / Mental Ability' },
+                    { topic: 'Basic English', subject: 'English' },
+                    { topic: 'Malayalam Language', subject: 'Malayalam' },
+                    { topic: 'General Science - Physics', subject: 'Physics' },
+                    { topic: 'General Science - Chemistry', subject: 'Chemistry' },
+                    { topic: 'General Science - Biology & Public Health', subject: 'Biology / Life Science' }
+                ];
+
+                for (const exam of exams) {
+                    for (const t of topics) {
+                        syllabusEntries.push({
+                            exam_id: exam.id,
+                            topic: t.topic,
+                            title: t.topic,
+                            subject: t.subject,
+                            questions: 20,
+                            duration: 15
+                        });
+                    }
+                }
+
+                // Use a loop to insert to avoid potential payload size issues
+                for (let i = 0; i < syllabusEntries.length; i += 50) {
+                    await upsertSupabaseData('syllabus', syllabusEntries.slice(i, i + 50), 'id');
+                }
+                return res.status(200).json({ message: `Rebuilt syllabus with ${syllabusEntries.length} entries.` });
+            }
+
+            case 'normalize-subjects': {
+                if (!supabase) throw new Error("Supabase required.");
+                const qData = await fetchAllSupabaseData('questionbank', 'id, subject');
+                const updates = qData.map(q => {
+                    const original = String(q.subject || '');
+                    const normalized = normalizeSubject(original);
+                    if (original !== normalized) {
+                        return { id: q.id, subject: normalized };
+                    }
+                    return null;
+                }).filter(Boolean) as any[];
+
+                if (updates.length > 0) {
+                    for (let i = 0; i < updates.length; i += 100) {
+                        await upsertSupabaseData('questionbank', updates.slice(i, i + 100));
+                    }
+                }
+                return res.status(200).json({ message: `Normalized ${updates.length} subjects.` });
             }
 
             case 'run-all-gaps': {

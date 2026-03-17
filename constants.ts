@@ -144,7 +144,18 @@ export const PHARMACIST_HOMOEOPATHY_CONTENT: ExamPageContent = {
 };
 
 export const EXAM_CONTENT_MAP: Record<string, ExamPageContent> = {
-    'ldc_lgs': { practiceTests: [], studyNotes: [], previousPapers: [] },
+    'ldc_lgs': { 
+      practiceTests: [
+        { id: 'ldc_gk_1', title: 'General Knowledge: Kerala & India', questions: 20, duration: 15, subject: 'General Knowledge', topic: 'General Knowledge' },
+        { id: 'ldc_hist_1', title: 'Kerala History & Renaissance', questions: 20, duration: 15, subject: 'Kerala History', topic: 'Kerala History & Renaissance' },
+        { id: 'ldc_polity_1', title: 'Indian Constitution & Polity', questions: 20, duration: 15, subject: 'Indian Polity / Constitution', topic: 'Indian Polity & Constitution' },
+        { id: 'ldc_math_1', title: 'Basic Arithmetic & Mental Ability', questions: 20, duration: 20, subject: 'Quantitative Aptitude', topic: 'Basic Arithmetic' },
+        { id: 'ldc_eng_1', title: 'General English Grammar', questions: 20, duration: 15, subject: 'English', topic: 'Basic English' },
+        { id: 'ldc_mal_1', title: 'Malayalam Grammar & Vocabulary', questions: 20, duration: 15, subject: 'Malayalam', topic: 'Malayalam Language' }
+      ], 
+      studyNotes: [], 
+      previousPapers: [] 
+    },
     'plus_two_prelims': { practiceTests: [], studyNotes: [], previousPapers: [] },
     'degree_prelims': { practiceTests: [], studyNotes: [], previousPapers: [] },
     'veo_exam': { practiceTests: [], studyNotes: [], previousPapers: [] },

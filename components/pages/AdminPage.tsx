@@ -259,7 +259,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             <div className="flex flex-wrap gap-2 overflow-x-auto pb-2">
                 {[
                     { id: 'automation', label: 'Automation', icon: BeakerIcon },
-                    { id: 'qbank', label: 'QA Audit', icon: ShieldCheckIcon },
+                    { id: 'qbank', label: 'Database Audit', icon: ShieldCheckIcon },
                     { id: 'exams', label: 'Exams', icon: AcademicCapIcon },
                     { id: 'syllabus', label: 'Syllabus', icon: PlusIcon },
                     { id: 'books', label: 'Books', icon: BookOpenIcon },
@@ -299,6 +299,9 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                 <ToolCard title="GK Fact Scraper" icon={LightBulbIcon} action="run-gk-scraper" color="bg-amber-500" desc="Generates unique study facts for the daily widget." />
                                 <ToolCard title="Flashcard Generator" icon={SparklesIcon} action="run-flashcard-generator" color="bg-rose-600" desc="AI generation of high-quality Malayalam flashcards with explanations." />
                                 <ToolCard title="Topic Normalization" icon={TagIcon} action="normalize-topics" color="bg-blue-600" desc={`Maps existing non-syllabus topics to approved syllabus topics. ${auditReport?.normalizationTodoCount ? `(${auditReport.normalizationTodoCount} pending)` : ''}`} />
+                                <ToolCard title="Database Cleanup" icon={SparklesIcon} action="clean-database" color="bg-slate-700" desc="Removes trailing whitespace from all topics and subjects in the database to fix matching issues." />
+                                <ToolCard title="Rebuild Syllabus" icon={PlusIcon} action="rebuild-syllabus" color="bg-amber-600" desc="Populates the syllabus table with standard PSC topics for all exams. Use this if exams show zero micro-topics." />
+                                <ToolCard title="Normalize Subjects" icon={ShieldCheckIcon} action="normalize-subjects" color="bg-teal-600" desc="Standardizes subject names in the question bank to match the approved list (e.g. 'Kerala History' instead of 'History of Kerala')." />
                             </div>
                         )}
 
