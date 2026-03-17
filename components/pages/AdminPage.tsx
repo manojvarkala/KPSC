@@ -243,7 +243,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                 <ToolCard title="Book Store Sync" icon={BookOpenIcon} action="run-book-scraper" color="bg-slate-800" desc="Updates bookstore with top Amazon PSC guides." />
                                 <ToolCard title="GK Fact Scraper" icon={LightBulbIcon} action="run-gk-scraper" color="bg-amber-500" desc="Generates unique study facts for the daily widget." />
                                 <ToolCard title="Flashcard Generator" icon={SparklesIcon} action="run-flashcard-generator" color="bg-rose-600" desc="AI generation of high-quality Malayalam flashcards with explanations." />
-                                <ToolCard title="Topic Normalization" icon={TagIcon} action="normalize-topics" color="bg-blue-600" desc={`Maps non-syllabus topics to approved syllabus topics. ${auditReport?.unapprovedTopics?.length ? `(${auditReport.unclassifiedCount} pending. Processes 50/batch)` : '(Processes 50/batch)'}`} />
+                                <ToolCard title="Topic Normalization" icon={TagIcon} action="normalize-topics" color="bg-blue-600" desc={`Maps non-syllabus topics to approved syllabus topics. ${auditReport?.unapprovedTopics?.length ? `(${auditReport.unclassifiedCount} pending. Processes 100/batch)` : '(Processes 100/batch)'}`} />
                             </div>
                         )}
 
@@ -265,7 +265,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                             <p className="text-5xl font-black text-rose-700 dark:text-rose-300">{(auditReport?.unclassifiedCount || 0) + (auditReport?.questionSubjectMismatches || 0)}</p>
                                             <p className="text-xs font-bold text-rose-500 mt-2">Questions needing Topic/Subject repair</p>
                                         </div>
-                                        <button onClick={() => handleAction('run-topic-repair')} className="mt-6 w-full bg-rose-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-rose-700 transition-all text-[10px] uppercase tracking-widest">Repair Batch (20)</button>
+                                        <button onClick={() => handleAction('run-topic-repair')} className="mt-6 w-full bg-rose-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-rose-700 transition-all text-[10px] uppercase tracking-widest">Repair Batch (100)</button>
                                     </div>
 
                                     <div className="bg-indigo-50 dark:bg-indigo-900/20 p-8 rounded-[2.5rem] border-2 border-indigo-100 dark:border-indigo-800 shadow-xl flex flex-col justify-between">
@@ -307,7 +307,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                         </div>
                                         <p className="text-xs font-bold text-orange-600/80 mb-4 uppercase tracking-widest">
                                             The following topics in your Question Bank do not match any micro-topic in your Syllabus. 
-                                            Use the "Topic Normalization" tool to map these to approved syllabus topics. (Processes 50 questions per click).
+                                            Use the "Topic Normalization" tool to map these to approved syllabus topics. (Processes 100 questions per click).
                                         </p>
                                         <div className="flex flex-wrap gap-2">
                                             {auditReport.unapprovedTopics.map(t => (

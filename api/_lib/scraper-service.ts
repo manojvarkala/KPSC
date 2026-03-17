@@ -563,7 +563,7 @@ export async function repairBlankTopics() {
         return { message: "No questions needing repair found. Please click 'Refresh Report' to scan the database first." };
     }
 
-    const batchIds = unmappedIds.slice(0, 50);
+    const batchIds = unmappedIds.slice(0, 100);
 
     // Fetch the full data for the questions to repair
     const { data: toRepair, error: repairErr } = await supabase
@@ -710,7 +710,7 @@ export async function normalizeTopics() {
         return { message: "No pending questions found. Please click 'Refresh Report' to scan the database first." };
     }
 
-    const batchIds = unmappedIds.slice(0, 50);
+    const batchIds = unmappedIds.slice(0, 100);
 
     // 3. Fetch the full data for the questions to repair
     const { data: toRepair, error: repairErr } = await supabase
