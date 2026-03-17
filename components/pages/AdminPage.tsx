@@ -380,7 +380,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                         </div>
                                         <p className="text-xs font-bold text-orange-600/80 mb-4 uppercase tracking-widest">
                                             The following topics in your Question Bank do not match any micro-topic in your Syllabus. 
-                                            Use the "Topic Normalization" tool to map these to approved syllabus topics. (Processes 100 questions per click).
+                                            Use the "Topic Normalization" tool to map these to approved syllabus topics. (Processes 500 questions per click).
                                         </p>
                                         <div className="flex flex-wrap gap-2">
                                             {auditReport.unapprovedTopics.map(t => (

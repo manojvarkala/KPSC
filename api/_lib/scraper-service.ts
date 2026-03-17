@@ -397,38 +397,48 @@ export async function generateSyllabusForExam(exam: { id: string, title_en: stri
         
         let coreTopics: any[] = [];
         
-        // Fetch distinct topics for this subject from the database
-        if (subject !== 'General Knowledge') {
-            const { data: qbData } = await supabase.from('questionbank').select('topic').eq('subject', subject);
-            if (qbData && qbData.length > 0) {
-                const uniqueTopics = Array.from(new Set(qbData.map(q => String(q.topic || '').trim()).filter(t => t && t.toLowerCase() !== 'mixed')));
+        const hsstMicroTopics: Record<string, string[]> = {
+            'Physics': ['Classical Mechanics', 'Mathematical Methods', 'Electronics', 'Quantum Mechanics', 'Electrodynamics', 'Statistical Physics', 'Spectroscopy', 'Condensed Matter', 'Nuclear Physics', 'Particle Physics'],
+            'Chemistry': ['Inorganic Chemistry', 'Organic Chemistry', 'Physical Chemistry', 'Analytical Chemistry', 'Polymer Chemistry', 'Environmental Chemistry'],
+            'Botany': ['Phycology & Mycology', 'Bryology & Pteridology', 'Microbiology & Plant Pathology', 'Angiosperm Anatomy & Taxonomy', 'Environmental Biology', 'Cell Biology & Genetics', 'Plant Physiology & Biochemistry', 'Biotechnology'],
+            'Zoology': ['Systematics & Evolutionary Biology', 'Physiology & Biochemistry', 'Microbiology & Immunology', 'Cell Biology & Genetics', 'Developmental Biology', 'Ecology & Ethology', 'Biotechnology & Bioinformatics'],
+            'Mathematics': ['Algebra', 'Real Analysis', 'Complex Analysis', 'Topology', 'Differential Equations', 'Differential Geometry', 'Functional Analysis', 'Number Theory'],
+            'Economics': ['Micro Economic Analysis', 'Macro Economic Analysis', 'Development & Planning', 'Public Finance', 'International Economics', 'Indian Economy', 'Statistical Methods', 'Kerala Economy'],
+            'Political Science': ['Political Theory', 'Public Administration', 'Comparative Politics', 'International Relations', 'Indian Constitution & Politics', 'Political Thought'],
+            'Geography': ['Geomorphology', 'Climatology', 'Oceanography', 'Geographic Thought', 'Population Geography', 'Economic Geography', 'Geography of India'],
+            'English': ['Chaucer to Neo-Classicism', 'The Romantics & Victorians', 'Twentieth Century Literature', 'Indian Literature in English', 'American Literature', 'Literary Theory & Criticism', 'Linguistics & Phonetics'],
+            'Malayalam': ['Pracheena Kavitha', 'Madhyakala Kavitha', 'Adhunika Kavitha', 'Gadhyasahithyam', 'Sahithya Vimarsanam', 'Bhashasasthram', 'Vyakaranam'],
+            'Sanskrit': ['Vyakarana', 'Nyaya', 'Sahitya', 'Vedanta', 'Jyotisha', 'General Sanskrit'],
+            'Commerce': ['Financial Accounting', 'Cost Accounting', 'Management Accounting', 'Financial Management', 'Marketing Management', 'Human Resource Management', 'Business Environment', 'Income Tax'],
+            'Sociology': ['Sociological Concepts', 'Sociological Thought', 'Research Methodology', 'Rural & Urban Sociology', 'Sociology of Development', 'Indian Society'],
+            'Statistics': ['Probability Theory', 'Distribution Theory', 'Estimation', 'Testing of Hypotheses', 'Sampling Techniques', 'Design of Experiments', 'Multivariate Analysis'],
+            'Psychology': ['Cognitive Psychology', 'Personality Theories', 'Social Psychology', 'Developmental Psychology', 'Clinical Psychology', 'Research Methodology'],
+            'Kannada': ['Ancient Literature', 'Medieval Literature', 'Modern Literature', 'Folk Literature', 'Poetics & Literary Criticism', 'History of Kannada Language'],
+            'Arabic': ['Classical Prose & Poetry', 'Modern Prose & Poetry', 'History of Arabic Literature', 'Arabic Grammar & Rhetoric', 'Translation & Composition'],
+            'Hindi': ['History of Hindi Literature', 'Ancient & Medieval Poetry', 'Modern Poetry', 'Hindi Fiction & Drama', 'Literary Criticism', 'Hindi Language & Grammar']
+        };
+
+        const predefinedTopics = hsstMicroTopics[subject];
+
+        if (predefinedTopics && predefinedTopics.length > 0) {
+            const qPerTopic = Math.max(1, Math.floor(70 / predefinedTopics.length));
+            const dPerTopic = Math.max(1, Math.floor(80 / predefinedTopics.length));
+            
+            let totalQ = 0;
+            predefinedTopics.forEach((ut, idx) => {
+                const isLast = idx === predefinedTopics.length - 1;
+                const qCount = isLast ? (70 - totalQ) : qPerTopic;
+                totalQ += qCount;
                 
-                if (uniqueTopics.length > 0) {
-                    // We need to distribute 70 questions among uniqueTopics.
-                    // If there are more topics than 70, just take the first 70 topics.
-                    const selectedTopics = uniqueTopics.slice(0, 70);
-                    const qPerTopic = Math.max(1, Math.floor(70 / selectedTopics.length));
-                    const dPerTopic = Math.max(1, Math.floor(80 / selectedTopics.length));
-                    
-                    let totalQ = 0;
-                    selectedTopics.forEach((ut, idx) => {
-                        const isLast = idx === selectedTopics.length - 1;
-                        const qCount = isLast ? (70 - totalQ) : qPerTopic;
-                        totalQ += qCount;
-                        
-                        coreTopics.push({
-                            topic: ut,
-                            subject: subject,
-                            questions: qCount,
-                            duration: dPerTopic
-                        });
-                    });
-                }
-            }
-        }
-        
-        // Fallback if no specific topics found
-        if (coreTopics.length === 0) {
+                coreTopics.push({
+                    topic: ut,
+                    subject: subject,
+                    questions: qCount,
+                    duration: dPerTopic
+                });
+            });
+        } else {
+            // Fallback if no specific topics found
             coreTopics = [{ topic: `${subject} (Core Subject)`, subject: subject, questions: 70, duration: 80 }];
         }
         
@@ -441,18 +451,85 @@ export async function generateSyllabusForExam(exam: { id: string, title_en: stri
     } else {
         const qPerTopic = 10; 
         const dPerTopic = isMains ? 12 : 9;
-        topics = [
-            { topic: 'General Knowledge', subject: 'General Knowledge', questions: qPerTopic, duration: dPerTopic },
-            { topic: 'Kerala History & Renaissance', subject: 'Kerala History', questions: qPerTopic, duration: dPerTopic },
-            { topic: 'Indian Polity & Constitution', subject: 'Indian Polity / Constitution', questions: qPerTopic, duration: dPerTopic },
-            { topic: 'Basic Arithmetic', subject: 'Quantitative Aptitude', questions: qPerTopic, duration: dPerTopic },
-            { topic: 'Mental Ability & Logical Reasoning', subject: 'Reasoning / Mental Ability', questions: qPerTopic, duration: dPerTopic },
-            { topic: 'Basic English', subject: 'English', questions: qPerTopic, duration: dPerTopic },
-            { topic: 'Malayalam Language', subject: 'Malayalam', questions: qPerTopic, duration: dPerTopic },
-            { topic: 'General Science - Physics', subject: 'Physics', questions: qPerTopic, duration: dPerTopic },
-            { topic: 'General Science - Chemistry', subject: 'Chemistry', questions: qPerTopic, duration: dPerTopic },
-            { topic: 'General Science - Biology & Public Health', subject: 'Biology / Life Science', questions: qPerTopic, duration: dPerTopic }
-        ];
+        
+        let specificTopics: any[] = [];
+        
+        if (exam.id === 'staff_nurse') {
+            specificTopics = [
+                { topic: 'Medical Surgical Nursing', subject: 'Nursing Science / Health Care', questions: 30, duration: 30 },
+                { topic: 'Anatomy & Physiology', subject: 'Biology / Life Science', questions: 20, duration: 20 },
+                { topic: 'Public Health & Sanitation', subject: 'Nursing Science / Health Care', questions: 20, duration: 20 }
+            ];
+        } else if (exam.id.includes('electrical') || exam.id.includes('kseb')) {
+            specificTopics = [
+                { topic: 'Electrical Circuits & Machines', subject: 'Physics', questions: 30, duration: 30 },
+                { topic: 'Power Systems', subject: 'Physics', questions: 20, duration: 20 },
+                { topic: 'Electrical Wiring', subject: 'Physics', questions: 20, duration: 20 }
+            ];
+        } else if (exam.id.includes('civil') || exam.id.includes('draughtsman')) {
+            specificTopics = [
+                { topic: 'Structural Engineering', subject: 'Physics', questions: 30, duration: 30 },
+                { topic: 'Civil Construction Basics', subject: 'Physics', questions: 40, duration: 40 }
+            ];
+        } else if (exam.id.includes('mechanical') || exam.id.includes('fitter') || exam.id.includes('turner')) {
+            specificTopics = [
+                { topic: 'Thermodynamics', subject: 'Physics', questions: 30, duration: 30 },
+                { topic: 'Mechanical Fitting', subject: 'Physics', questions: 40, duration: 40 }
+            ];
+        } else if (exam.id === 'jphn_anm' || exam.id === 'junior_health_inspector') {
+            specificTopics = [
+                { topic: 'Public Health & Sanitation', subject: 'Nursing Science / Health Care', questions: 40, duration: 40 },
+                { topic: 'Anatomy & Physiology', subject: 'Biology / Life Science', questions: 30, duration: 30 }
+            ];
+        } else if (exam.id === 'pharmacist_gr2') {
+            specificTopics = [
+                { topic: 'Pharmacology & Pharmaceutics', subject: 'Nursing Science / Health Care', questions: 50, duration: 50 },
+                { topic: 'Anatomy & Physiology', subject: 'Biology / Life Science', questions: 20, duration: 20 }
+            ];
+        } else if (exam.id === 'blood_bank_tech') {
+            specificTopics = [
+                { topic: 'Blood Banking Techniques', subject: 'Nursing Science / Health Care', questions: 50, duration: 50 },
+                { topic: 'Anatomy & Physiology', subject: 'Biology / Life Science', questions: 20, duration: 20 }
+            ];
+        } else if (exam.id === 'lp_up_assistant_malayalam') {
+            specificTopics = [
+                { topic: 'Teaching Aptitude & Pedagogy', subject: 'Educational Psychology / Pedagogy', questions: 30, duration: 30 },
+                { topic: 'Malayalam Grammar', subject: 'Malayalam', questions: 20, duration: 20 },
+                { topic: 'Malayalam Vocabulary & Idioms', subject: 'Malayalam', questions: 20, duration: 20 }
+            ];
+        }
+
+        if (specificTopics.length > 0) {
+            topics = [
+                ...specificTopics,
+                { topic: 'General Knowledge', subject: 'General Knowledge', questions: 10, duration: 10 },
+                { topic: 'Kerala History & Renaissance', subject: 'Kerala History', questions: 10, duration: 10 },
+                { topic: 'Basic Arithmetic', subject: 'Quantitative Aptitude', questions: 10, duration: 10 }
+            ];
+        } else {
+            const qPerTopic = 5; 
+            const dPerTopic = isMains ? 6 : 5;
+            topics = [
+                { topic: 'Current Affairs & Renaissance', subject: 'Current Affairs', questions: qPerTopic, duration: dPerTopic },
+                { topic: 'Important National & International Events', subject: 'Current Affairs', questions: qPerTopic, duration: dPerTopic },
+                { topic: 'Kerala History & Renaissance', subject: 'Kerala History', questions: qPerTopic, duration: dPerTopic },
+                { topic: 'Indian History', subject: 'Indian History', questions: qPerTopic, duration: dPerTopic },
+                { topic: 'Kerala Geography', subject: 'Kerala Geography', questions: qPerTopic, duration: dPerTopic },
+                { topic: 'World & Indian Geography', subject: 'Indian Geography', questions: qPerTopic, duration: dPerTopic },
+                { topic: 'Indian Economy & Kerala Economy', subject: 'Indian Economy', questions: qPerTopic, duration: dPerTopic },
+                { topic: 'Indian Polity & Constitution', subject: 'Indian Polity / Constitution', questions: qPerTopic, duration: dPerTopic },
+                { topic: 'Environment & Forestry', subject: 'Environment', questions: qPerTopic, duration: dPerTopic },
+                { topic: 'Kerala Specific', subject: 'Kerala Specific GK', questions: qPerTopic, duration: dPerTopic },
+                { topic: 'Basic Arithmetic', subject: 'Quantitative Aptitude', questions: qPerTopic, duration: dPerTopic },
+                { topic: 'Mental Ability & Logical Reasoning', subject: 'Reasoning / Mental Ability', questions: qPerTopic, duration: dPerTopic },
+                { topic: 'Basic English', subject: 'English', questions: qPerTopic, duration: dPerTopic },
+                { topic: 'Malayalam Language', subject: 'Malayalam', questions: qPerTopic, duration: dPerTopic },
+                { topic: 'General Science - Physics', subject: 'Physics', questions: qPerTopic, duration: dPerTopic },
+                { topic: 'General Science - Chemistry', subject: 'Chemistry', questions: qPerTopic, duration: dPerTopic },
+                { topic: 'General Science - Biology & Public Health', subject: 'Biology / Life Science', questions: qPerTopic, duration: dPerTopic },
+                { topic: 'Arts Literature Culture & Sports', subject: 'Arts, Culture & Sports', questions: qPerTopic, duration: dPerTopic }
+            ];
+        }
     }
 
     const syllabusEntries = topics.map(t => ({
@@ -824,7 +901,7 @@ export async function normalizeTopics() {
         return { message: "No pending questions found. Please click 'Refresh Report' to scan the database first." };
     }
 
-    const batchIds = unmappedIds.slice(0, 100);
+    const batchIds = unmappedIds.slice(0, 500);
 
     // 3. Fetch the full data for the questions to repair
     const { data: toRepair, error: repairErr } = await supabase
@@ -841,13 +918,28 @@ export async function normalizeTopics() {
         return { message: "Could not fetch questions to repair. Cleaned up stale IDs." };
     }
 
-    const result = await processNormalizationBatch(toRepair, approvedMappings);
+    let totalNormalized = 0;
+    let totalFailed = 0;
+
+    // Process in smaller batches of 100 to avoid AI token limits
+    for (let i = 0; i < toRepair.length; i += 100) {
+        const smallBatch = toRepair.slice(i, i + 100);
+        const result = await processNormalizationBatch(smallBatch, approvedMappings);
+        
+        // Parse the result message to accumulate counts
+        const match = result.message.match(/normalized (\d+) questions/);
+        if (match) {
+            totalNormalized += parseInt(match[1]);
+        } else {
+            totalFailed += smallBatch.length;
+        }
+    }
 
     // 4. Update TODO list
     const remainingIds = unmappedIds.filter(id => !batchIds.includes(id));
     await upsertSupabaseData('settings', [{ key: 'normalization_todo_ids', value: JSON.stringify(remainingIds) }], 'key');
 
-    return result;
+    return { message: `Processed ${toRepair.length} questions. Normalized ${totalNormalized} topics. Failed to map ${totalFailed}.` };
 }
 
 async function processNormalizationBatch(toRepair: any[], approvedMappings: { topic: string, subject: string }[]) {

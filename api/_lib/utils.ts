@@ -5,6 +5,19 @@ export function normalizeSubject(subject: string, topic: string = '', question: 
     const q = String(question || '').toLowerCase().trim();
     const context = `${s} ${t} ${q}`;
 
+    // 0. Preserve HSST Core Subjects (Exact or very close matches in subject field)
+    const hsstSubjects = [
+        "Mathematics", "Botany", "Zoology", "Economics", "Political Science", 
+        "Statistics", "Geography", "Sanskrit", "Kannada", "Philosophy", 
+        "Psychology", "Commerce", "Physical Education", "Music", "Arabic", "Hindi", "Sociology"
+    ];
+    
+    for (const hsstSub of hsstSubjects) {
+        if (s === hsstSub.toLowerCase() || s.includes(hsstSub.toLowerCase())) {
+            return hsstSub;
+        }
+    }
+
     // 1. Core Subject Mapping
     if (context.includes('renaissance') || context.includes('നവോത്ഥാനം')) return "Kerala History / Renaissance";
     if (context.includes('kerala history') || context.includes('കേരള ചരിത്രം')) return "Kerala History";
@@ -17,6 +30,12 @@ export function normalizeSubject(subject: string, topic: string = '', question: 
     if (context.includes('indian geo') || context.includes('ഇന്ത്യൻ ഭൂമിശാസ്ത്രം') || context.includes('himalaya') || context.includes('ganga') || context.includes('world geography')) return "Indian Geography";
     if (context.includes('polity') || context.includes('const') || context.includes('ഭരണഘടന') || context.includes('article') || context.includes('panchayat') || context.includes('administration')) return "Indian Polity / Constitution";
     if (context.includes('economy') || context.includes('സാമ്പത്തിക') || context.includes('gdp') || context.includes('budget')) return "Indian Economy";
+    
+    if (context.includes('nursing') || context.includes('health') || context.includes('pharmacology') || context.includes('blood bank')) return "Nursing Science / Health Care";
+    if (context.includes('electrical') || context.includes('power system') || context.includes('circuit')) return "Physics";
+    if (context.includes('civil') || context.includes('structural') || context.includes('construction')) return "Physics";
+    if (context.includes('mechanical') || context.includes('thermodynamics') || context.includes('fitting') || context.includes('turner')) return "Physics";
+    if (context.includes('teaching') || context.includes('pedagogy') || context.includes('education')) return "Educational Psychology / Pedagogy";
     
     if (context.includes('biology') || context.includes('ജീവശാസ്ത്രം') || context.includes('life science') || context.includes('cell') || context.includes('human body') || context.includes('anatomy') || context.includes('physiology') || context.includes('botany') || context.includes('zoology')) return "Biology / Life Science";
     if (context.includes('chemistry') || context.includes('രസതന്ത്രം') || context.includes('element') || context.includes('formula') || context.includes('organic') || context.includes('inorganic')) return "Chemistry";
