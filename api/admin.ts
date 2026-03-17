@@ -246,14 +246,13 @@ export default async function handler(req: any, res: any) {
                 const syllabusTopicsLower = Array.from(new Set(syllabusMappings.map(m => m.t)));
                 const syllabusComposites = new Set(syllabusMappings.map(m => m.composite));
 
-                let unclassifiedCount = 0;
+                const normalizationTodoIds: number[] = [];
+                const repairTodoIds: number[] = [];
                 const approvedLower = APPROVED_SUBJECTS.map(s => s.toLowerCase().trim());
                 const subjectMismatches: string[] = [];
                 const unapprovedTopics: string[] = [];
                 let questionSubjectMismatches = 0;
-                
-                const normalizationTodoIds: number[] = [];
-                const repairTodoIds: number[] = [];
+                let unclassifiedCount = 0;
 
                 qData?.forEach(q => { 
                     const s = String(q.subject || '').trim();
@@ -267,7 +266,7 @@ export default async function handler(req: any, res: any) {
                     const isSubjectApproved = approvedLower.includes(sLower);
 
                     // A question is "Classified" ONLY if its Subject+Topic combo exists in the syllabus
-                    // and the subject is in the approved list.
+                    // AND the subject is in the approved list.
                     const isInvalid = !isComboValid || !isSubjectApproved;
 
                     if (isInvalid) {
@@ -290,7 +289,7 @@ export default async function handler(req: any, res: any) {
                             normalizationTodoIds.push(q.id);
                         } 
                         // 2. If topic is valid but subject is wrong (mismatch or not approved) -> Repair
-                        else if (!isComboValid || !isSubjectApproved) {
+                        else {
                             repairTodoIds.push(q.id);
                         }
                     }
@@ -306,10 +305,9 @@ export default async function handler(req: any, res: any) {
                 const gapReport: any[] = [];
                 
                 (sData || []).forEach(s => {
-                    // Prioritize 'topic' field as it's the "Syllabus Topic" in the sheet
                     let topicName = s.topic;
                     if (!topicName || String(topicName).toLowerCase() === 'null' || String(topicName).trim() === '') {
-                        topicName = s.title; // Fallback to title if topic is truly empty
+                        topicName = s.title;
                     }
                     if (!topicName || String(topicName).toLowerCase() === 'null' || String(topicName).trim() === '') {
                         topicName = "General Topic";
@@ -319,43 +317,40 @@ export default async function handler(req: any, res: any) {
                     const sSubject = String(s.subject || '').toLowerCase().trim();
                     const compositeKey = `${sSubject}|${sTopic}`;
 
-                    if (uniqueTopics.has(compositeKey)) return; // Skip duplicates
+                    if (uniqueTopics.has(compositeKey)) return;
                     uniqueTopics.add(compositeKey);
 
-                    if (s.subject && !approvedLower.includes(s.subject.toLowerCase().trim())) {
+                    // Check if syllabus subject is approved
+                    if (s.subject && !approvedLower.includes(sSubject)) {
                         if (!subjectMismatches.includes(s.subject)) subjectMismatches.push(s.subject);
                     }
                     
-                    // Stricter matching: 
-                    // 1. Exact match on BOTH Subject and Topic
                     const matchedTopics = new Set<string>();
-
-                    const count = qData?.filter(q => {
+                    const matchedQs = qData?.filter(q => {
                         const qTopic = String(q.topic || '').toLowerCase().trim();
                         const qSubject = String(q.subject || '').toLowerCase().trim();
                         
-                        let isMatch = false;
-
-                        // Exact match on both Subject and Topic is the new standard
-                        if (qTopic === sTopic && qSubject === sSubject) {
-                            isMatch = true;
-                        }
-                        // Fallback: If topic is empty but subject matches the syllabus topic name (legacy support)
-                        else if (qTopic === '' && qSubject === sTopic) {
-                            isMatch = true;
-                        }
-
-                        if (isMatch && qTopic) matchedTopics.add(qTopic);
+                        // Must match BOTH subject and topic exactly
+                        const isMatch = qTopic === sTopic && qSubject === sSubject;
+                        if (isMatch && qTopic) matchedTopics.add(q.topic);
                         return isMatch;
-                    }).length || 0;
+                    }) || [];
 
-                    gapReport.push({ id: s.id, topic: topicName, count, subject: s.subject, matchedTopics: Array.from(matchedTopics) });
+                    gapReport.push({ 
+                        id: s.id, 
+                        topic: topicName, 
+                        count: matchedQs.length, 
+                        subject: s.subject, 
+                        matchedTopics: Array.from(matchedTopics) 
+                    });
                 });
 
                 return res.status(200).json({ 
-                    syllabusReport: gapReport, 
+                    syllabusReport: gapReport.sort((a, b) => a.count - b.count), 
                     totalQuestions,
                     unclassifiedCount,
+                    normalizationTodoCount: normalizationTodoIds.length,
+                    repairTodoCount: repairTodoIds.length,
                     questionSubjectMismatches,
                     subjectMismatches,
                     unapprovedTopics,
