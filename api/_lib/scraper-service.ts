@@ -152,14 +152,21 @@ export async function generateQuestionsForGaps(batchSizeOrTopic: number | string
     } else {
         const { data: sData } = await supabase.from('syllabus').select('topic, subject, title');
         if (!sData?.length) return { message: "No syllabus found." };
-        const qData = await fetchAllSupabaseData('questionbank', 'topic');
+        const qData = await fetchAllSupabaseData('questionbank', 'topic, subject');
         const counts: Record<string, number> = {};
-        qData?.forEach(q => { const t = String(q.topic || '').toLowerCase().trim(); if (t) counts[t] = (counts[t] || 0) + 1; });
+        qData?.forEach(q => { 
+            const t = String(q.topic || '').toLowerCase().trim(); 
+            const s = String(q.subject || '').toLowerCase().trim();
+            const key = `${s}|${t}`;
+            if (t) counts[key] = (counts[key] || 0) + 1; 
+        });
         targetMappings = sData.map(s => {
             let t = s.topic;
             if (!t || t === 'null' || t.trim() === '') t = s.title;
             if (!t || t === 'null' || t.trim() === '') t = "Unnamed Topic";
-            return { topic: t, subject: s.subject || 'General Knowledge', count: counts[String(t).toLowerCase().trim()] || 0 };
+            const sub = s.subject || 'General Knowledge';
+            const key = `${sub.toLowerCase().trim()}|${String(t).toLowerCase().trim()}`;
+            return { topic: t, subject: sub, count: counts[key] || 0 };
         }).sort((a, b) => a.count - b.count).slice(0, batchSizeOrTopic as number);
     }
 
@@ -167,14 +174,15 @@ export async function generateQuestionsForGaps(batchSizeOrTopic: number | string
         const ai = getAi();
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview', 
-            contents: `Generate 5 high-quality Kerala PSC MCQs for: ${targetMappings.map(m => `${m.subject} -> ${m.topic}`).join(', ')}.
+            contents: `Generate 5 high-quality Kerala PSC MCQs for each of these micro-topics:
+            ${targetMappings.map(m => `- Subject: "${m.subject}", Topic: "${m.topic}"`).join('\n')}
             
             CONTEXT (Micro-topics grouped by category):
             ${JSON.stringify(SYLLABUS_STRUCTURE, null, 2)}
 
             CRITICAL RULES:
             1. Subject field MUST be exactly one from this list: [${APPROVED_SUBJECTS.join(', ')}]
-            2. Topic field MUST be exactly the topic name provided above (e.g. if I asked for "Computer", the topic must be "Computer").
+            2. Topic field MUST be exactly the topic name provided above.
             3. Questions must be in Malayalam.
             4. Explanations must be in Malayalam.
             
@@ -187,18 +195,19 @@ export async function generateQuestionsForGaps(batchSizeOrTopic: number | string
             let currentId = (maxIdRow?.id || 50000) + 1;
             
             const sbData = items.map((item: any) => {
-                // If we were targeting a single specific topic, enforce it regardless of what AI returned
-                const enforcedTopic = targetMappings.length === 1 ? targetMappings[0].topic : (item.topic || targetMappings[0].topic);
-                const enforcedSubject = item.subject || targetMappings[0].subject;
+                // Find the matching target mapping to enforce correct Subject + Topic
+                const target = targetMappings.find(m => 
+                    m.topic.toLowerCase().trim() === String(item.topic || '').toLowerCase().trim()
+                ) || targetMappings[0];
 
                 return {
                     id: currentId++, 
-                    topic: enforcedTopic, 
+                    topic: target.topic, 
                     question: item.question, 
                     options: ensureArray(item.options), 
                     correct_answer_index: parseInt(String(item.correctAnswerIndex || 1)), 
-                    subject: enforcedSubject, 
-                    difficulty: 'PSC Level', 
+                    subject: target.subject, 
+                    difficulty: 'PSC Level',
                     explanation: item.explanation || ''
                 };
             });
@@ -570,21 +579,27 @@ export async function repairBlankTopics() {
     }
 
     try {
-        // Get approved topics from syllabus for strict mapping
-        const { data: sData } = await supabase.from('syllabus').select('topic, title');
-        const approvedTopics = Array.from(new Set((sData || []).map(s => s.topic || s.title).filter(Boolean)));
+        // Get approved mappings from syllabus for strict mapping
+        const { data: sData } = await supabase.from('syllabus').select('topic, title, subject');
+        const approvedMappings = (sData || []).map(s => ({
+            topic: s.topic || s.title || 'General',
+            subject: s.subject || 'General Knowledge'
+        })).filter(m => m.topic && m.subject);
 
         const ai = getAi();
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: `Analyze these Kerala PSC questions and assign the most appropriate Topic and Subject for each.
+            contents: `Analyze these Kerala PSC questions and assign the most appropriate Subject and Topic for each from the approved list.
             
             CRITICAL RULES:
-            1. Subject MUST be exactly one from this list: [${APPROVED_SUBJECTS.join(', ')}]
-            2. Topic MUST be exactly one from this Approved Topics list: [${approvedTopics.join(', ')}]
-            3. If no perfect match exists in the Approved Topics list, pick the most relevant one. DO NOT invent new topics.
+            1. You MUST pick a pair from the Approved Mappings list below.
+            2. Do NOT invent new topics or subjects.
+            3. If no perfect match exists, pick the most relevant pair.
             
-            Syllabus Context for mapping:
+            Approved Mappings (Subject -> Topic):
+            ${JSON.stringify(approvedMappings.map(m => `${m.subject} -> ${m.topic}`), null, 2)}
+            
+            Syllabus Context for understanding categories:
             ${JSON.stringify(SYLLABUS_STRUCTURE, null, 2)}
             
             Questions to repair: ${JSON.stringify(toRepair.map(q => ({ id: q.id, question: q.question, currentSubject: q.subject, currentTopic: q.topic })))}
@@ -595,32 +610,30 @@ export async function repairBlankTopics() {
         
         const updates = JSON.parse(response.text || "[]");
         if (updates.length > 0) {
-            const approvedLower = approvedTopics.map(t => String(t).toLowerCase().trim());
             const finalData = toRepair.map(q => {
                 const update = updates.find((u: any) => u.id == q.id);
                 if (!update) return q;
                 
-                // Strict mapping: Ensure topic is from the approved list
-                let matchedTopic = update.topic;
-                const updateTopicLower = String(update.topic || '').toLowerCase().trim();
-                const matchIndex = approvedLower.indexOf(updateTopicLower);
+                // Strict mapping: Ensure Subject + Topic pair is from the approved list
+                const matchedMapping = approvedMappings.find(m => 
+                    m.topic.toLowerCase().trim() === String(update.topic || '').toLowerCase().trim() &&
+                    m.subject.toLowerCase().trim() === String(update.subject || '').toLowerCase().trim()
+                );
                 
-                if (matchIndex !== -1) {
-                    matchedTopic = approvedTopics[matchIndex]; // Use exact casing from syllabus
+                if (matchedMapping) {
+                    return { 
+                        ...q, 
+                        topic: matchedMapping.topic,
+                        subject: matchedMapping.subject
+                    };
                 } else {
-                    // Try partial match if no exact match
-                    const partialMatch = approvedTopics.find(t => 
-                        t.toLowerCase().includes(updateTopicLower) || 
-                        updateTopicLower.includes(t.toLowerCase())
-                    );
-                    matchedTopic = partialMatch || q.topic || 'General';
+                    // If AI returned a non-existent combo, try to at least match the topic
+                    const topicMatch = approvedMappings.find(m => m.topic.toLowerCase().trim() === String(update.topic || '').toLowerCase().trim());
+                    if (topicMatch) {
+                        return { ...q, topic: topicMatch.topic, subject: topicMatch.subject };
+                    }
+                    return q; // Fallback to original if no match found
                 }
-
-                return { 
-                    ...q, 
-                    topic: matchedTopic,
-                    subject: APPROVED_SUBJECTS.includes(update.subject) ? update.subject : (q.subject || 'General Knowledge')
-                };
             });
             
             await upsertSupabaseData('questionbank', finalData);
@@ -677,11 +690,14 @@ export async function syncSupabaseToSheets() {
 export async function normalizeTopics() {
     if (!supabase) throw new Error("Supabase required.");
     
-    // 1. Get approved topics from syllabus
+    // 1. Get approved mappings from syllabus
     const { data: sData } = await supabase.from('syllabus').select('topic, title, subject');
-    const approvedTopics = Array.from(new Set((sData || []).map(s => s.topic || s.title).filter(Boolean)));
+    const approvedMappings = (sData || []).map(s => ({
+        topic: s.topic || s.title || 'General',
+        subject: s.subject || 'General Knowledge'
+    })).filter(m => m.topic && m.subject);
     
-    if (approvedTopics.length === 0) throw new Error("No syllabus topics found to normalize against.");
+    if (approvedMappings.length === 0) throw new Error("No syllabus topics found to normalize against.");
 
     // 2. Read TODO list from settings
     const { data: todoSetting } = await supabase.from('settings').select('value').eq('key', 'normalization_todo_ids').single();
@@ -711,7 +727,7 @@ export async function normalizeTopics() {
         return { message: "Could not fetch questions to repair. Cleaned up stale IDs." };
     }
 
-    const result = await processNormalizationBatch(toRepair, approvedTopics);
+    const result = await processNormalizationBatch(toRepair, approvedMappings);
 
     // 4. Update TODO list
     const remainingIds = unmappedIds.filter(id => !batchIds.includes(id));
@@ -720,15 +736,15 @@ export async function normalizeTopics() {
     return result;
 }
 
-async function processNormalizationBatch(toRepair: any[], approvedTopics: string[]) {
+async function processNormalizationBatch(toRepair: any[], approvedMappings: { topic: string, subject: string }[]) {
     try {
         const ai = getAi();
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: `You are a Kerala PSC syllabus expert. Map these "Old Topics" to the most appropriate "Approved Syllabus Topics" from the provided list.
+            contents: `You are a Kerala PSC syllabus expert. Map these "Old Topics" to the most appropriate "Approved Syllabus Mappings" from the provided list.
             
-            Approved Syllabus Topics:
-            ${JSON.stringify(approvedTopics)}
+            Approved Syllabus Mappings (Subject -> Topic):
+            ${JSON.stringify(approvedMappings.map(m => `${m.subject} -> ${m.topic}`), null, 2)}
             
             Approved Subjects:
             ${JSON.stringify(APPROVED_SUBJECTS)}
@@ -737,8 +753,8 @@ async function processNormalizationBatch(toRepair: any[], approvedTopics: string
             ${JSON.stringify(toRepair.map(q => ({ id: q.id, question: q.question, oldTopic: q.topic, subject: q.subject })))}
             
             Rules:
-            1. If a direct match exists in Approved Topics, use it.
-            2. If no direct match, pick the most relevant micro-topic from the Approved Topics list. DO NOT invent new topics.
+            1. You MUST pick a pair from the Approved Mappings list.
+            2. If no direct match, pick the most relevant micro-topic from the Approved Mappings list. DO NOT invent new topics.
             3. Ensure the Subject is also correct according to the new Topic and must be from the Approved Subjects list.
             
             Return JSON array: [{ "id": number, "topic": "string", "subject": "string" }]`,
@@ -747,32 +763,30 @@ async function processNormalizationBatch(toRepair: any[], approvedTopics: string
         
         const updates = JSON.parse(response.text || "[]");
         if (updates.length > 0) {
-            const approvedLower = approvedTopics.map(t => String(t).toLowerCase().trim());
             const finalData = toRepair.map(q => {
                 const update = updates.find((u: any) => u.id == q.id);
                 if (!update) return q;
 
-                // Strict mapping: Ensure topic is from the approved list
-                let matchedTopic = update.topic;
-                const updateTopicLower = String(update.topic || '').toLowerCase().trim();
-                const matchIndex = approvedLower.indexOf(updateTopicLower);
+                // Strict mapping: Ensure Subject + Topic pair is from the approved list
+                const matchedMapping = approvedMappings.find(m => 
+                    m.topic.toLowerCase().trim() === String(update.topic || '').toLowerCase().trim() &&
+                    m.subject.toLowerCase().trim() === String(update.subject || '').toLowerCase().trim()
+                );
                 
-                if (matchIndex !== -1) {
-                    matchedTopic = approvedTopics[matchIndex]; // Use exact casing from syllabus
+                if (matchedMapping) {
+                    return { 
+                        ...q, 
+                        topic: matchedMapping.topic,
+                        subject: matchedMapping.subject
+                    };
                 } else {
-                    // Try partial match if no exact match
-                    const partialMatch = approvedTopics.find(t => 
-                        t.toLowerCase().includes(updateTopicLower) || 
-                        updateTopicLower.includes(t.toLowerCase())
-                    );
-                    matchedTopic = partialMatch || q.topic || 'General';
+                    // Fallback: Try to match just the topic if combo fails
+                    const topicMatch = approvedMappings.find(m => m.topic.toLowerCase().trim() === String(update.topic || '').toLowerCase().trim());
+                    if (topicMatch) {
+                        return { ...q, topic: topicMatch.topic, subject: topicMatch.subject };
+                    }
+                    return q; // Fallback to original if no match found
                 }
-
-                return { 
-                    ...q, 
-                    topic: matchedTopic,
-                    subject: APPROVED_SUBJECTS.includes(update.subject) ? update.subject : (q.subject || 'General Knowledge')
-                };
             });
             
             await upsertSupabaseData('questionbank', finalData);

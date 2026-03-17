@@ -141,14 +141,14 @@ export default async function handler(req: any, res: any) {
             let fetchLimit = limitCount;
             if (tableName === 'questionbank') {
                 if (topic && topic !== 'mixed') {
-                    const words = topic.split(/[\s,.-]+/).filter((w: string) => w.length > 2);
-                    if (words.length > 0) {
-                        const ilikeConditions = words.map((w: string) => `topic.ilike.%${w}%,subject.ilike.%${w}%`).join(',');
-                        query = query.or(ilikeConditions);
-                    } else {
-                        query = query.or(`topic.ilike.%${topic}%,subject.ilike.%${topic}%`);
+                    // Stricter matching: Exact (case-insensitive) match on Topic
+                    query = query.ilike('topic', topic);
+                    
+                    // If subject is also provided, filter by it too
+                    if (subject && subject !== 'mixed' && subject !== 'General') {
+                        query = query.ilike('subject', subject);
                     }
-                    fetchLimit = 200; // Fetch more to sort by relevance
+                    fetchLimit = 100; 
                 } else if (subject && subject !== 'mixed' && subject !== 'General') {
                     query = query.ilike('subject', `%${subject}%`);
                 }
@@ -172,20 +172,7 @@ export default async function handler(req: any, res: any) {
             
             if (!error && data && data.length > 0) {
                 if (tableName === 'questionbank') {
-                    let finalData = data;
-                    if (topic && topic !== 'mixed') {
-                        const targetWords = topic.toLowerCase().split(/[\s,.-]+/).filter((w: string) => w.length > 2);
-                        finalData = data.map(q => {
-                            const qText = `${q.topic || ''} ${q.subject || ''}`.toLowerCase();
-                            let score = 0;
-                            // Exact match gives highest score
-                            if (qText.includes(topic.toLowerCase())) score += 10;
-                            targetWords.forEach((w: string) => { if (qText.includes(w)) score++; });
-                            return { ...q, _score: score };
-                        }).sort((a, b) => b._score - a._score).slice(0, limitCount);
-                    } else {
-                        finalData = data.slice(0, limitCount);
-                    }
+                    const finalData = data.slice(0, limitCount);
 
                     const processedQuestions = finalData.map(q => {
                         const originalOptions = smartParseOptions(q.options);

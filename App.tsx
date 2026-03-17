@@ -111,7 +111,7 @@ const App: React.FC = () => {
   }, [syncStateFromHash, isAppLoading]);
 
   useEffect(() => {
-    if (settings.subscription_model_active === 'false') { setSubscriptionStatus('pro'); return; }
+    if (settings.subscription_model_active === 'false' || settings.free_pro_mode === 'true') { setSubscriptionStatus('pro'); return; }
     const fetchSub = async () => {
         if (isSignedIn && user?.id) {
           const data = await subscriptionService.getSubscriptionData(user.id);

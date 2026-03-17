@@ -9,8 +9,7 @@ import {
     getExamSyllabus,
     getSubscriptions,
     getBooks,
-    getSettings,
-    updateSetting
+    getSettings
 } from '../../services/pscDataService';
 import { TrashIcon } from '../icons/TrashIcon';
 import { BookOpenIcon } from '../icons/BookOpenIcon';
@@ -59,8 +58,15 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [selectedExamId, setSelectedExamId] = useState('');
     const [syllabusItems, setSyllabusItems] = useState<PracticeTest[]>([]);
     const [auditReport, setAuditReport] = useState<AuditReport | null>(null);
-    const [settings, setSettings] = useState<any>({});
+    const [settings, setSettings] = useState<Record<string, string>>({});
     
+    const updateSetting = async (key: string, value: string) => {
+        try {
+            await handleAction('update-setting', { setting: { key, value } });
+            setSettings(prev => ({ ...prev, [key]: value }));
+        } catch (err) { console.error("Failed to update setting:", err); }
+    };
+
     const [editingExam, setEditingExam] = useState<any | null>(null);
     const [editingBook, setEditingBook] = useState<any | null>(null);
 
@@ -445,20 +451,46 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             <div className="space-y-8 animate-fade-in max-w-2xl mx-auto">
                                 <h3 className="text-2xl font-black uppercase tracking-tight">App Configuration</h3>
                                 <div className="space-y-6">
-                                    {Object.entries(settings).map(([key, value]) => (
+                                    {/* Special Toggle for Free Pro Mode */}
+                                    <div className="bg-indigo-50 dark:bg-indigo-900/20 p-8 rounded-[2.5rem] border border-indigo-100 dark:border-indigo-800 flex items-center justify-between gap-6 shadow-xl shadow-indigo-500/5">
+                                        <div>
+                                            <h4 className="text-lg font-black uppercase tracking-tight text-indigo-900 dark:text-indigo-100">Free Pro Mode</h4>
+                                            <p className="text-xs font-bold text-indigo-600/70 mt-1">When enabled, all users get Pro features for free.</p>
+                                        </div>
+                                        <button 
+                                            onClick={() => updateSetting('free_pro_mode', settings.free_pro_mode === 'true' ? 'false' : 'true')}
+                                            className={`w-20 h-10 rounded-full p-1 transition-all duration-500 ${settings.free_pro_mode === 'true' ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                        >
+                                            <div className={`w-8 h-8 bg-white rounded-full shadow-lg transform transition-transform duration-500 ${settings.free_pro_mode === 'true' ? 'translate-x-10' : 'translate-x-0'}`} />
+                                        </button>
+                                    </div>
+
+                                    {Object.entries(settings).filter(([k]) => k !== 'free_pro_mode').map(([key, value]) => (
                                         <div key={key} className="bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 flex flex-col gap-2">
                                             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">{key.replace(/_/g, ' ')}</label>
                                             <div className="flex items-center space-x-3">
                                                 <input 
                                                     type="text" 
                                                     defaultValue={String(value)}
-                                                    onBlur={async (e) => await handleAction('update-setting', { setting: { key, value: e.target.value } })}
+                                                    onBlur={async (e) => await updateSetting(key, e.target.value)}
                                                     className="flex-1 bg-white dark:bg-slate-800 p-3 rounded-xl border-none font-bold text-sm shadow-inner" 
                                                 />
                                                 <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><CheckCircleIcon className="h-4 w-4" /></div>
                                             </div>
                                         </div>
                                     ))}
+
+                                    <div className="pt-8 border-t dark:border-slate-800">
+                                        <button 
+                                            onClick={() => {
+                                                const key = prompt("Enter new setting key:");
+                                                if (key) updateSetting(key, "value");
+                                            }}
+                                            className="w-full py-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400 font-black uppercase text-[10px] tracking-widest hover:border-indigo-300 hover:text-indigo-400 transition-all"
+                                        >
+                                            + Add New Configuration Key
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}

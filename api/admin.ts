@@ -204,6 +204,12 @@ export default async function handler(req: any, res: any) {
                 return res.status(200).json({ message: `Filled gaps for ${batch.length} topics.` });
             }
 
+            case 'get-settings': {
+                if (!supabase) throw new Error("Supabase required.");
+                const { data: settings } = await supabase.from('settings').select('*');
+                return res.status(200).json(settings || []);
+            }
+
             case 'update-setting': {
                 if (supabase) await upsertSupabaseData('settings', [setting], 'key');
                 await findAndUpsertRow('Settings', setting.key, [setting.key, setting.value]);
@@ -298,20 +304,19 @@ export default async function handler(req: any, res: any) {
                     }
                     
                     const sTopic = String(topicName).toLowerCase().trim();
-                    if (uniqueTopics.has(sTopic)) return; // Skip duplicates
-                    uniqueTopics.add(sTopic);
-
                     const sSubject = String(s.subject || '').toLowerCase().trim();
+                    const compositeKey = `${sSubject}|${sTopic}`;
+
+                    if (uniqueTopics.has(compositeKey)) return; // Skip duplicates
+                    uniqueTopics.add(compositeKey);
 
                     if (s.subject && !approvedLower.includes(s.subject.toLowerCase().trim())) {
                         if (!subjectMismatches.includes(s.subject)) subjectMismatches.push(s.subject);
                     }
                     
                     // Stricter matching: 
-                    // 1. Exact match on topic
-                    // 2. If topic is very specific, don't just match subject
+                    // 1. Exact match on BOTH Subject and Topic
                     const matchedTopics = new Set<string>();
-                    const sTopicWords = sTopic.split(/[\s,.-]+/).filter(w => w.length > 2);
 
                     const count = qData?.filter(q => {
                         const qTopic = String(q.topic || '').toLowerCase().trim();
@@ -319,17 +324,13 @@ export default async function handler(req: any, res: any) {
                         
                         let isMatch = false;
 
-                        // Exact topic match is the gold standard
-                        if (qTopic === sTopic) isMatch = true;
-                        // If the question's topic is empty but its subject matches this syllabus topic
-                        else if (qTopic === '' && qSubject === sTopic) isMatch = true;
-                        // Word-based matching (similar to API fetching logic)
-                        else if (sTopicWords.length > 0) {
-                            const qText = `${qTopic} ${qSubject}`;
-                            let score = 0;
-                            sTopicWords.forEach(w => { if (qText.includes(w)) score++; });
-                            // If it matches at least half the words, consider it a match
-                            if (score >= Math.ceil(sTopicWords.length / 2)) isMatch = true;
+                        // Exact match on both Subject and Topic is the new standard
+                        if (qTopic === sTopic && qSubject === sSubject) {
+                            isMatch = true;
+                        }
+                        // Fallback: If topic is empty but subject matches the syllabus topic name (legacy support)
+                        else if (qTopic === '' && qSubject === sTopic) {
+                            isMatch = true;
                         }
 
                         if (isMatch && qTopic) matchedTopics.add(qTopic);
