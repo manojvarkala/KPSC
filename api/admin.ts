@@ -234,12 +234,17 @@ export default async function handler(req: any, res: any) {
                 const { data: lastAuditedSetting } = await supabase.from('settings').select('value').eq('key', 'last_audited_id').single();
                 const lastAuditedId = parseInt(lastAuditedSetting?.value || '0');
 
-                // 4. Prepare syllabus topic list for matching
-                const syllabusTopicsLower = (sData || []).map(s => {
+                // 4. Prepare syllabus mapping for matching
+                const syllabusMappings = (sData || []).map(s => {
                     let name = s.topic;
                     if (!name || String(name).toLowerCase() === 'null' || String(name).trim() === '') name = s.title;
-                    return String(name || '').toLowerCase().trim();
-                }).filter(Boolean);
+                    const t = String(name || '').toLowerCase().trim();
+                    const sub = String(s.subject || '').toLowerCase().trim();
+                    return { t, sub, composite: `${sub}|${t}` };
+                }).filter(m => m.t);
+
+                const syllabusTopicsLower = Array.from(new Set(syllabusMappings.map(m => m.t)));
+                const syllabusComposites = new Set(syllabusMappings.map(m => m.composite));
 
                 let unclassifiedCount = 0;
                 const approvedLower = APPROVED_SUBJECTS.map(s => s.toLowerCase().trim());
@@ -255,32 +260,39 @@ export default async function handler(req: any, res: any) {
                     const sLower = s.toLowerCase();
                     const t = String(q.topic || '').trim();
                     const tLower = t.toLowerCase();
+                    const composite = `${sLower}|${tLower}`;
 
-                    // Check if subject is invalid
-                    const isInvalidSubject = sLower === 'other' || sLower.includes('manual') || sLower === '' || sLower === 'null' || !approvedLower.includes(sLower);
-                    
-                    // Check if topic is invalid (empty or not in syllabus)
-                    const isInvalidTopic = tLower === '' || tLower === 'null' || !syllabusTopicsLower.includes(tLower);
+                    const isTopicInSyllabus = syllabusTopicsLower.includes(tLower);
+                    const isComboValid = syllabusComposites.has(composite);
+                    const isSubjectApproved = approvedLower.includes(sLower);
 
-                    if (isInvalidSubject || isInvalidTopic) {
+                    // A question is "Classified" ONLY if its Subject+Topic combo exists in the syllabus
+                    // and the subject is in the approved list.
+                    const isInvalid = !isComboValid || !isSubjectApproved;
+
+                    if (isInvalid) {
                         unclassifiedCount++;
                         
-                        if (sLower !== '' && sLower !== 'null' && !approvedLower.includes(sLower)) {
+                        // If subject is not in approved list, it's a mismatch
+                        if (sLower !== '' && sLower !== 'null' && !isSubjectApproved) {
                             questionSubjectMismatches++;
                             if (!subjectMismatches.includes(s)) subjectMismatches.push(s);
                         }
 
-                        if (tLower !== '' && tLower !== 'null' && !syllabusTopicsLower.includes(tLower)) {
+                        // If topic is not in syllabus at all, it's unapproved
+                        if (tLower !== '' && tLower !== 'null' && !isTopicInSyllabus) {
                             if (!unapprovedTopics.includes(t)) unapprovedTopics.push(t);
                         }
-                    }
 
-                    // Populate TODO lists
-                    if (tLower === '' || tLower === 'null' || sLower === '' || sLower === 'null' || !approvedLower.includes(sLower)) {
-                        repairTodoIds.push(q.id);
-                    }
-                    if (tLower === '' || tLower === 'null' || !syllabusTopicsLower.includes(tLower)) {
-                        normalizationTodoIds.push(q.id);
+                        // Populate TODO lists
+                        // 1. If topic is missing or not in syllabus -> Normalization (needs mapping)
+                        if (tLower === '' || tLower === 'null' || !isTopicInSyllabus) {
+                            normalizationTodoIds.push(q.id);
+                        } 
+                        // 2. If topic is valid but subject is wrong (mismatch or not approved) -> Repair
+                        else if (!isComboValid || !isSubjectApproved) {
+                            repairTodoIds.push(q.id);
+                        }
                     }
                 });
 
