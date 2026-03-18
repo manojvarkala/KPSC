@@ -21,11 +21,15 @@ export async function upsertSupabaseData(table: string, data: any[], onConflict:
         const entry: any = { ...item };
         
         // Define tables with integer IDs
-        const intIdTables = ['questionbank', 'results', 'liveupdates'];
-        if (intIdTables.includes(cleanTable) && entry.id !== undefined) {
+        const intIdTables = ['questionbank', 'results', 'liveupdates', 'syllabus'];
+        if (intIdTables.includes(cleanTable) && entry.id !== undefined && entry.id !== null) {
             const parsedId = parseInt(String(entry.id));
-            entry.id = isNaN(parsedId) ? (Date.now() + Math.floor(Math.random() * 1000)) : parsedId;
-        } else if (entry.id !== undefined) {
+            if (isNaN(parsedId)) {
+                delete entry.id; // Let DB handle it if it's not a valid number
+            } else {
+                entry.id = parsedId;
+            }
+        } else if (entry.id !== undefined && entry.id !== null) {
             entry.id = String(entry.id).trim();
         }
 
@@ -57,15 +61,18 @@ export async function upsertSupabaseData(table: string, data: any[], onConflict:
 
     processedData.forEach(item => {
         const pkValue = item[onConflict];
-        if (pkValue !== undefined && pkValue !== null) {
+        if (pkValue !== undefined && pkValue !== null && pkValue !== '') {
             uniqueMap.set(pkValue, item);
         } else {
-            // If no PK, we can't upsert on it, but we can still try to insert it
-            // For syllabus, we might want to generate a deterministic ID if missing
+            // For items without a PK, we can try to find a natural key to deduplicate within the batch
+            // but we DON'T set it as the 'id' field because 'id' might be an integer/smallint
+            let naturalKey = null;
             if (cleanTable === 'syllabus' && item.exam_id && item.topic) {
-                const generatedId = `${item.exam_id}_${item.topic.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-                item.id = generatedId;
-                uniqueMap.set(generatedId, item);
+                naturalKey = `syllabus_${item.exam_id}_${item.topic}`;
+            }
+            
+            if (naturalKey) {
+                uniqueMap.set(naturalKey, item);
             } else {
                 noPkItems.push(item);
             }
@@ -121,7 +128,7 @@ export async function fetchAllSupabaseData(table: string, select: string = '*') 
 export async function deleteSupabaseRow(table: string, id: string) {
     if (!supabase) return null;
     const cleanTable = table.toLowerCase();
-    const intIdTables = ['questionbank', 'results', 'liveupdates'];
+    const intIdTables = ['questionbank', 'results', 'liveupdates', 'syllabus'];
     const cleanId = intIdTables.includes(cleanTable) ? parseInt(id) : id;
     const { error } = await supabase.from(cleanTable).delete().eq('id', cleanId);
     if (error) throw error;
