@@ -381,19 +381,24 @@ export async function runDailyUpdateScrapers() {
 }
 
 export async function generateSyllabusForExam(exam: { id: string, title_en: string, level: string }) {
-    if (!supabase) return;
-    
     const title = String(exam.title_en || '').toLowerCase();
     const level = String(exam.level || '').toLowerCase();
     const isMains = title.includes('mains') || title.includes('main') || level.includes('main');
-    const isHsst = title.includes('hsst');
+    const isHsst = title.includes('hsst') || title.includes('higher secondary school teacher');
+    const isTeaching = title.includes('teacher') || 
+                       title.includes('lp/up') || 
+                       title.includes('lpsa') || 
+                       title.includes('upsa') || 
+                       title.includes('school assistant') || 
+                       title.includes('hsa') ||
+                       (title.includes('assistant') && (title.includes('malayalam') || title.includes('tamil') || title.includes('kannada') || title.includes('arabic') || title.includes('hindi') || title.includes('sanskrit')));
 
     let topics: any[] = [];
 
-    if (isHsst) {
+    if (isHsst || isTeaching) {
         // Find the subject from the title
         const subjectMatch = APPROVED_SUBJECTS.find(s => title.includes(s.toLowerCase()));
-        const subject = subjectMatch || 'General Knowledge';
+        const subject = subjectMatch || (isHsst ? 'General Knowledge' : 'Educational Psychology / Pedagogy');
         
         let coreTopics: any[] = [];
         
@@ -415,39 +420,80 @@ export async function generateSyllabusForExam(exam: { id: string, title_en: stri
             'Psychology': ['Cognitive Psychology', 'Personality Theories', 'Social Psychology', 'Developmental Psychology', 'Clinical Psychology', 'Research Methodology'],
             'Kannada': ['Ancient Literature', 'Medieval Literature', 'Modern Literature', 'Folk Literature', 'Poetics & Literary Criticism', 'History of Kannada Language'],
             'Arabic': ['Classical Prose & Poetry', 'Modern Prose & Poetry', 'History of Arabic Literature', 'Arabic Grammar & Rhetoric', 'Translation & Composition'],
-            'Hindi': ['History of Hindi Literature', 'Ancient & Medieval Poetry', 'Modern Poetry', 'Hindi Fiction & Drama', 'Literary Criticism', 'Hindi Language & Grammar']
+            'Hindi': ['History of Hindi Literature', 'Ancient & Medieval Poetry', 'Modern Poetry', 'Hindi Fiction & Drama', 'Literary Criticism', 'Hindi Language & Grammar'],
+            'Physical Education': ['History of Physical Education', 'Anatomy & Physiology', 'Kinesiology & Biomechanics', 'Sports Psychology', 'Methods of Physical Education', 'Health Education', 'Test & Measurement', 'Training Methods'],
+            'Music': ['History of Indian Music', 'Musical Forms', 'Raga System', 'Tala System', 'Musical Instruments', 'Biographies of Great Musicians', 'Theory of Music'],
+            'Computer Science / IT / Cyber Laws': ['Computer Organization', 'Data Structures & Algorithms', 'Operating Systems', 'Database Management Systems', 'Software Engineering', 'Computer Networks', 'Web Technologies', 'Cyber Laws & Ethics']
         };
 
-        const predefinedTopics = hsstMicroTopics[subject];
+        const teachingMicroTopics = [
+            'Child Development & Learning',
+            'Educational Psychology',
+            'Pedagogy & Teaching Aptitude',
+            'Inclusive Education',
+            'Educational Philosophy',
+            'Classroom Management',
+            'Evaluation & Assessment',
+            'ICT in Education',
+            'Learning Theories',
+            'Motivation & Personality'
+        ];
+
+        let predefinedTopics = hsstMicroTopics[subject];
+        
+        // If it's a teaching exam but not HSST, and we have a language subject, combine teaching + language
+        if (isTeaching && !isHsst) {
+            if (subject !== 'Educational Psychology / Pedagogy') {
+                // Language or other subject + Teaching
+                predefinedTopics = [...(predefinedTopics || []), ...teachingMicroTopics];
+            } else {
+                predefinedTopics = teachingMicroTopics;
+            }
+        }
 
         if (predefinedTopics && predefinedTopics.length > 0) {
-            const qPerTopic = Math.max(1, Math.floor(70 / predefinedTopics.length));
+            const totalCoreQ = isHsst ? 70 : 60; // Reduced core for LP/UP to allow more general topics
+            const qPerTopic = Math.max(1, Math.floor(totalCoreQ / predefinedTopics.length));
             const dPerTopic = Math.max(1, Math.floor(80 / predefinedTopics.length));
             
             let totalQ = 0;
             predefinedTopics.forEach((ut, idx) => {
                 const isLast = idx === predefinedTopics.length - 1;
-                const qCount = isLast ? (70 - totalQ) : qPerTopic;
+                const qCount = isLast ? (totalCoreQ - totalQ) : qPerTopic;
                 totalQ += qCount;
                 
                 coreTopics.push({
                     topic: ut,
-                    subject: subject,
+                    subject: teachingMicroTopics.includes(ut) ? 'Educational Psychology / Pedagogy' : subject,
                     questions: qCount,
                     duration: dPerTopic
                 });
             });
         } else {
             // Fallback if no specific topics found
-            coreTopics = [{ topic: `${subject} (Core Subject)`, subject: subject, questions: 70, duration: 80 }];
+            coreTopics = [{ topic: `${subject} (Core Subject)`, subject: subject, questions: isHsst ? 70 : 60, duration: 80 }];
         }
         
-        topics = [
-            ...coreTopics,
-            { topic: 'Research Methodology & Teaching Aptitude', subject: 'Educational Psychology / Pedagogy', questions: 10, duration: 15 },
-            { topic: 'General Knowledge & Current Affairs', subject: 'General Knowledge', questions: 10, duration: 15 },
-            { topic: 'Indian Constitution & Social Welfare', subject: 'Indian Polity / Constitution', questions: 10, duration: 10 }
-        ];
+        if (isHsst) {
+            topics = [
+                ...coreTopics,
+                { topic: 'Research Methodology & Teaching Aptitude', subject: 'Educational Psychology / Pedagogy', questions: 10, duration: 15 },
+                { topic: 'General Knowledge & Current Affairs', subject: 'General Knowledge', questions: 10, duration: 15 },
+                { topic: 'Indian Constitution & Social Welfare', subject: 'Indian Polity / Constitution', questions: 10, duration: 10 }
+            ];
+        } else {
+            // LP/UP or other teaching exams
+            topics = [
+                ...coreTopics,
+                { topic: 'General Knowledge & Current Affairs', subject: 'General Knowledge', questions: 10, duration: 10 },
+                { topic: 'Kerala History & Renaissance', subject: 'Kerala History', questions: 5, duration: 5 },
+                { topic: 'Indian Constitution', subject: 'Indian Polity / Constitution', questions: 5, duration: 5 },
+                { topic: 'General Science', subject: 'General Science / Science & Tech', questions: 5, duration: 5 },
+                { topic: 'Basic Arithmetic', subject: 'Quantitative Aptitude', questions: 5, duration: 5 },
+                { topic: 'Basic English', subject: 'English', questions: 5, duration: 5 },
+                { topic: 'Malayalam Language', subject: 'Malayalam', questions: 5, duration: 5 }
+            ];
+        }
     } else {
         const qPerTopic = 10; 
         const dPerTopic = isMains ? 12 : 9;
@@ -542,12 +588,16 @@ export async function generateSyllabusForExam(exam: { id: string, title_en: stri
     }));
 
     // Delete existing syllabus for this exam to avoid duplicates
-    await supabase.from('syllabus').delete().eq('exam_id', exam.id);
+    if (supabase) {
+        await supabase.from('syllabus').delete().eq('exam_id', exam.id);
 
-    // Use a loop to insert to avoid potential payload size issues
-    for (let i = 0; i < syllabusEntries.length; i += 50) {
-        await upsertSupabaseData('syllabus', syllabusEntries.slice(i, i + 50), 'id');
+        // Use a loop to insert to avoid potential payload size issues
+        for (let i = 0; i < syllabusEntries.length; i += 50) {
+            await upsertSupabaseData('syllabus', syllabusEntries.slice(i, i + 50), 'id');
+        }
     }
+
+    return syllabusEntries;
 }
 
 export async function scrapeGkFacts() {

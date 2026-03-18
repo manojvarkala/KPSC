@@ -128,7 +128,7 @@ export default async function handler(req: any, res: any) {
         return await handleTestConnection(res);
     }
 
-    // try { await verifyAdmin(req); } catch (e: any) { return res.status(401).json({ error: e.message }); }
+    try { await verifyAdmin(req); } catch (e: any) { return res.status(401).json({ error: e.message }); }
 
     try {
         switch (action) {

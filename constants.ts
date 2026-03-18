@@ -143,6 +143,33 @@ export const PHARMACIST_HOMOEOPATHY_CONTENT: ExamPageContent = {
   previousPapers: []
 };
 
+export const LP_UP_ASSISTANT_CONTENT: ExamPageContent = {
+  practiceTests: [
+    { id: 'lpup_ped_1', title: 'Child Development & Learning Theories', questions: 20, duration: 20, subject: 'Educational Psychology / Pedagogy', topic: 'Child Development & Learning' },
+    { id: 'lpup_ped_2', title: 'Educational Psychology & Personality', questions: 20, duration: 20, subject: 'Educational Psychology / Pedagogy', topic: 'Educational Psychology' },
+    { id: 'lpup_ped_3', title: 'Pedagogy, Teaching Aptitude & ICT', questions: 20, duration: 20, subject: 'Educational Psychology / Pedagogy', topic: 'Pedagogy & Teaching Aptitude' },
+    { id: 'lpup_ped_4', title: 'Inclusive Education & Classroom Management', questions: 20, duration: 20, subject: 'Educational Psychology / Pedagogy', topic: 'Inclusive Education' },
+    { id: 'lpup_gk_1', title: 'General Knowledge & Current Affairs', questions: 20, duration: 15, subject: 'General Knowledge', topic: 'General Knowledge & Current Affairs' },
+    { id: 'lpup_mal_1', title: 'Malayalam Grammar & Literature', questions: 20, duration: 15, subject: 'Malayalam', topic: 'Malayalam Language' },
+    { id: 'lpup_eng_1', title: 'English Grammar & Usage', questions: 20, duration: 15, subject: 'English', topic: 'Basic English' },
+    { id: 'lpup_math_1', title: 'Basic Arithmetic & Mental Ability', questions: 20, duration: 20, subject: 'Quantitative Aptitude', topic: 'Basic Arithmetic' },
+    { id: 'lpup_sci_1', title: 'General Science (Physics, Chemistry, Biology)', questions: 20, duration: 15, subject: 'General Science / Science & Tech', topic: 'General Science' }
+  ],
+  studyNotes: [],
+  previousPapers: []
+};
+
+export const HSST_GENERAL_CONTENT: ExamPageContent = {
+  practiceTests: [
+    { id: 'hsst_gen_1', title: 'Research Methodology & Teaching Aptitude', questions: 20, duration: 20, subject: 'Educational Psychology / Pedagogy', topic: 'Research Methodology & Teaching Aptitude' },
+    { id: 'hsst_gen_2', title: 'General Knowledge & Current Affairs', questions: 20, duration: 15, subject: 'General Knowledge', topic: 'General Knowledge & Current Affairs' },
+    { id: 'hsst_gen_3', title: 'Indian Constitution & Social Welfare', questions: 20, duration: 15, subject: 'Indian Polity / Constitution', topic: 'Indian Constitution & Social Welfare' },
+    { id: 'hsst_gen_4', title: 'Educational Psychology & Pedagogy', questions: 20, duration: 20, subject: 'Educational Psychology / Pedagogy', topic: 'Educational Psychology' }
+  ],
+  studyNotes: [],
+  previousPapers: []
+};
+
 export const EXAM_CONTENT_MAP: Record<string, ExamPageContent> = {
     'ldc_lgs': { 
       practiceTests: [
@@ -160,7 +187,7 @@ export const EXAM_CONTENT_MAP: Record<string, ExamPageContent> = {
     'degree_prelims': { practiceTests: [], studyNotes: [], previousPapers: [] },
     'veo_exam': { practiceTests: [], studyNotes: [], previousPapers: [] },
     'fireman_exam': { practiceTests: [], studyNotes: [], previousPapers: [] },
-    'lp_up_assistant_malayalam': { practiceTests: [], studyNotes: [], previousPapers: [] },
+    'lp_up_assistant_malayalam': LP_UP_ASSISTANT_CONTENT,
     'staff_nurse': { practiceTests: [], studyNotes: [], previousPapers: [] },
     'kseb_sub_eng': { practiceTests: [], studyNotes: [], previousPapers: [] },
     'si_police_2026': { practiceTests: [], studyNotes: [], previousPapers: [] },
@@ -183,18 +210,18 @@ export const EXAM_CONTENT_MAP: Record<string, ExamPageContent> = {
     'tradesman_draughtsman_civil': { practiceTests: [], studyNotes: [], previousPapers: [] },
     'blood_bank_tech': { practiceTests: [], studyNotes: [], previousPapers: [] },
     'prof_assistant_library': { practiceTests: [], studyNotes: [], previousPapers: [] },
-    'hsst_sanskrit': { practiceTests: [], studyNotes: [], previousPapers: [] },
-    'hsst_english': { practiceTests: [], studyNotes: [], previousPapers: [] },
-    'hsst_kannada': { practiceTests: [], studyNotes: [], previousPapers: [] },
-    'hsst_sociology': { practiceTests: [], studyNotes: [], previousPapers: [] },
-    'hsst_statistics': { practiceTests: [], studyNotes: [], previousPapers: [] },
-    'hsst_political_science': { practiceTests: [], studyNotes: [], previousPapers: [] },
-    'hsst_economics': { practiceTests: [], studyNotes: [], previousPapers: [] },
-    'hsst_botany': { practiceTests: [], studyNotes: [], previousPapers: [] },
-    'hsst_zoology': { practiceTests: [], studyNotes: [], previousPapers: [] },
-    'hsst_geography': { practiceTests: [], studyNotes: [], previousPapers: [] },
+    'hsst_sanskrit': HSST_GENERAL_CONTENT,
+    'hsst_english': HSST_GENERAL_CONTENT,
+    'hsst_kannada': HSST_GENERAL_CONTENT,
+    'hsst_sociology': HSST_GENERAL_CONTENT,
+    'hsst_statistics': HSST_GENERAL_CONTENT,
+    'hsst_political_science': HSST_GENERAL_CONTENT,
+    'hsst_economics': HSST_GENERAL_CONTENT,
+    'hsst_botany': HSST_GENERAL_CONTENT,
+    'hsst_zoology': HSST_GENERAL_CONTENT,
+    'hsst_geography': HSST_GENERAL_CONTENT,
     'hsst_chemistry': HSST_CHEMISTRY_CONTENT,
-    'hsst_mathematics': { practiceTests: [], studyNotes: [], previousPapers: [] },
+    'hsst_mathematics': HSST_GENERAL_CONTENT,
     'hsst_physics': HSST_PHYSICS_CONTENT,
 };
 
@@ -274,22 +301,29 @@ export const SYLLABUS_STRUCTURE = {
     'General Science - Physics', 'General Science - Chemistry', 'General Science - Biology & Public Health', 
     'Electrical Circuits & Machines', 'Structural Engineering', 'Power Systems', 'Thermodynamics', 
     'Civil Construction Basics', 'Mechanical Fitting', 'Electrical Wiring', 'Blood Banking Techniques', 
-    'Anatomy & Physiology', 'Medical Surgical Nursing', 'Pharmacology & Pharmaceutics', 'Public Health & Sanitation'
+    'Anatomy & Physiology', 'Medical Surgical Nursing', 'Pharmacology & Pharmaceutics', 'Public Health & Sanitation',
+    'Computer Organization', 'Data Structures & Algorithms', 'Operating Systems', 'Database Management Systems',
+    'Software Engineering', 'Computer Networks', 'Web Technologies', 'Cyber Laws & Ethics'
   ],
   'Languages / Literature': [
     'Malayalam Grammar', 'Malayalam Vocabulary & Idioms', 'Grammar & Usage', 'Vocabulary & Comprehension', 
     'Basic English', 'Malayalam Language', 'Sanskrit Literature & Grammar', 'English Literature & Language', 
-    'Arts Literature Culture & Sports'
+    'Arts Literature Culture & Sports', 'Hindi Literature & Grammar', 'Kannada Literature', 'Arabic Literature',
+    'Tamil Literature'
   ],
   'Aptitude / Reasoning / Maths': [
     'Basic Arithmetic', 'Mental Ability & Logical Reasoning', 'Arithmetic & Reasoning', 'Simple Maths', 'Algebra & Calculus'
   ],
   'Education / Pedagogy': [
-    'Teaching Aptitude & Pedagogy'
+    'Child Development & Learning', 'Educational Psychology', 'Pedagogy & Teaching Aptitude', 
+    'Inclusive Education', 'Educational Philosophy', 'Classroom Management', 'Evaluation & Assessment', 
+    'ICT in Education', 'Learning Theories', 'Motivation & Personality', 'Research Methodology & Teaching Aptitude'
   ],
   'Specialized / Subject Specific': [
     'Computer Basics & IT Awareness', 'Library Management', 'Police & Law', 'Excise Laws Basics', 
-    'Botany & Plant Physiology', 'Zoology & Animal Physiology', 'Organic & Inorganic Chemistry', 'Mechanics & Electromagnetism'
+    'Botany & Plant Physiology', 'Zoology & Animal Physiology', 'Organic & Inorganic Chemistry', 'Mechanics & Electromagnetism',
+    'Physical Education Theory', 'History of Physical Education', 'Anatomy & Physiology in Sports', 'Kinesiology & Biomechanics',
+    'Sports Psychology', 'Health Education', 'Music Theory & History', 'Raga & Tala System'
   ]
 };
 
