@@ -67,6 +67,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         try {
             await handleAction('update-setting', { setting: { key, value } });
             setSettings(prev => ({ ...prev, [key]: value }));
+            window.dispatchEvent(new Event('settings_updated'));
         } catch (err) { console.error("Failed to update setting:", err); }
     };
 

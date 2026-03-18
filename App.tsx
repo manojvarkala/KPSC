@@ -66,6 +66,17 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+      const refreshSettings = async () => {
+          try {
+              const s = await getSettings();
+              if (s) setSettings(s);
+          } catch (e) { console.error("Failed to refresh settings:", e); }
+      };
+      window.addEventListener('settings_updated', refreshSettings);
+      return () => window.removeEventListener('settings_updated', refreshSettings);
+  }, []);
+
+  useEffect(() => {
       if (clerkLoaded) setIsAppLoading(false);
       const safetyExit = setTimeout(() => setIsAppLoading(false), 6000);
       return () => clearTimeout(safetyExit);
