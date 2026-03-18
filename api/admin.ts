@@ -198,7 +198,9 @@ export default async function handler(req: any, res: any) {
                     await generateSyllabusForExam(exam);
                 }
 
-                return res.status(200).json({ message: `Rebuilt syllabus for ${exams.length} exams with standard PSC topics.` });
+                await syncSupabaseToSheets();
+
+                return res.status(200).json({ message: `Rebuilt syllabus for ${exams.length} exams and synced to Google Sheets.` });
             }
 
             case 'rebuild-hsst-syllabus': {
@@ -213,7 +215,9 @@ export default async function handler(req: any, res: any) {
                     await generateSyllabusForExam(exam);
                 }
 
-                return res.status(200).json({ message: `Rebuilt syllabus for ${hsstExams.length} HSST exams with subject-specific topics.` });
+                await syncSupabaseToSheets();
+
+                return res.status(200).json({ message: `Rebuilt syllabus for ${hsstExams.length} HSST exams and synced to Google Sheets.` });
             }
 
             case 'reconfigure-syllabus': {

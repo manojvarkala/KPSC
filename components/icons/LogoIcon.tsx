@@ -7,8 +7,10 @@ interface LogoProps {
 }
 
 export const LogoIcon: React.FC<LogoProps> = ({ className, variant = 'transparent' }) => {
-    // Note: Assuming logo files are named logo-transparent.png and logo-dark.png in the root
-    const logoSrc = variant === 'transparent' ? '/logo-transparent.png' : '/logo-dark.png';
+    // Use reliable external URLs as primary sources to prevent flashing from missing local files
+    const logoSrc = variant === 'transparent' 
+        ? 'https://raw.githubusercontent.com/cusatalumni/KPSC/main/logo-transparent.png' 
+        : 'https://raw.githubusercontent.com/cusatalumni/KPSC/main/logo-dark.png';
     
     return (
         <div className={`${className} flex items-center justify-center overflow-hidden`}>

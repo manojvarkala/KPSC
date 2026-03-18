@@ -53,14 +53,28 @@ export async function upsertSupabaseData(table: string, data: any[], onConflict:
     // 2. CRITICAL: Deduplicate the input array by the primary key
     // This prevents "ON CONFLICT DO UPDATE command cannot affect row a second time"
     const uniqueMap = new Map();
+    const noPkItems: any[] = [];
+
     processedData.forEach(item => {
         const pkValue = item[onConflict];
         if (pkValue !== undefined && pkValue !== null) {
             uniqueMap.set(pkValue, item);
+        } else {
+            // If no PK, we can't upsert on it, but we can still try to insert it
+            // For syllabus, we might want to generate a deterministic ID if missing
+            if (cleanTable === 'syllabus' && item.exam_id && item.topic) {
+                const generatedId = `${item.exam_id}_${item.topic.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+                item.id = generatedId;
+                uniqueMap.set(generatedId, item);
+            } else {
+                noPkItems.push(item);
+            }
         }
     });
     
-    const finalBatch = Array.from(uniqueMap.values());
+    const finalBatch = [...Array.from(uniqueMap.values()), ...noPkItems];
+
+    if (finalBatch.length === 0) return null;
 
     const { data: result, error } = await supabase
         .from(cleanTable)

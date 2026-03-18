@@ -903,7 +903,7 @@ export async function syncSupabaseToSheets() {
     const tables = [
         { name: 'Exams', table: 'exams', cols: ['id', 'title_ml', 'title_en', 'description_ml', 'description_en', 'category', 'level', 'icon_type'] },
         { name: 'QuestionBank', table: 'questionbank', cols: ['id', 'topic', 'question', 'options', 'correct_answer_index', 'subject', 'difficulty', 'explanation'] },
-        { name: 'Syllabus', table: 'syllabus', cols: ['id', 'exam_id', 'subject', 'topic', 'title', 'description'] },
+        { name: 'Syllabus', table: 'syllabus', cols: ['id', 'exam_id', 'title', 'questions', 'duration', 'subject', 'topic'] },
         { name: 'Bookstore', table: 'bookstore', cols: ['id', 'title', 'author', 'imageUrl', 'amazonLink'] }
     ];
 
