@@ -48,8 +48,26 @@ export default async function handler(req: any, res: any) {
             let fetchLimit = limitCount;
             if (tableName === 'questionbank') {
                 if (cleanTopic && cleanTopic.toLowerCase() !== 'mixed') {
-                    // Use wildcards to handle variations and trailing spaces
-                    query = query.ilike('topic', `%${cleanTopic}%`);
+                    // Fetch topic mappings to include micro-topics
+                    let mappedTopics = [cleanTopic];
+                    try {
+                        const { data: mappingData } = await supabase.from('settings').select('value').eq('key', 'topic_mappings').maybeSingle();
+                        if (mappingData && mappingData.value) {
+                            const mappings = JSON.parse(mappingData.value);
+                            // Find mappings where the syllabus topic matches cleanTopic (case-insensitive)
+                            const matchingKey = Object.keys(mappings).find(k => k.toLowerCase() === cleanTopic.toLowerCase());
+                            if (matchingKey && Array.isArray(mappings[matchingKey])) {
+                                mappedTopics = [...mappedTopics, ...mappings[matchingKey]];
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Failed to fetch topic mappings:", e);
+                    }
+
+                    // Use OR condition to match the main topic or any of its micro-topics
+                    // Escape commas in topics by wrapping the value in double quotes for PostgREST
+                    const orConditions = mappedTopics.map(t => `topic.ilike."%${t.replace(/"/g, '""')}%"`).join(',');
+                    query = query.or(orConditions);
                     
                     if (cleanSubject && cleanSubject.toLowerCase() !== 'mixed' && cleanSubject.toLowerCase() !== 'general') {
                         query = query.ilike('subject', `%${cleanSubject}%`);

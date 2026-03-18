@@ -1019,39 +1019,54 @@ async function processNormalizationBatch(toRepair: any[], approvedMappings: { to
         
         const updates = JSON.parse(response.text || "[]");
         if (updates.length > 0) {
-            const finalData = toRepair.map(q => {
-                const update = updates.find((u: any) => u.id == q.id);
-                if (!update) return q;
+            // Fetch existing topic mappings
+            const { data: mappingData } = await supabase.from('settings').select('value').eq('key', 'topic_mappings').maybeSingle();
+            let topicMappings: Record<string, string[]> = {};
+            if (mappingData && mappingData.value) {
+                try { topicMappings = JSON.parse(mappingData.value); } catch (e) {}
+            }
+
+            let mappedCount = 0;
+
+            updates.forEach((update: any) => {
+                const originalQuestion = toRepair.find(q => q.id === update.id);
+                const oldTopic = originalQuestion ? originalQuestion.topic : null;
+                const newTopic = update.topic;
+
+                if (!oldTopic || !newTopic) return;
 
                 // Strict mapping: Ensure Subject + Topic pair is from the approved list
                 const matchedMapping = approvedMappings.find(m => 
-                    m.topic.toLowerCase().trim() === String(update.topic || '').toLowerCase().trim() &&
+                    m.topic.toLowerCase().trim() === String(newTopic).toLowerCase().trim() &&
                     m.subject.toLowerCase().trim() === String(update.subject || '').toLowerCase().trim()
                 );
                 
+                let finalTopic = null;
                 if (matchedMapping) {
-                    return { 
-                        ...q, 
-                        topic: matchedMapping.topic,
-                        subject: matchedMapping.subject
-                    };
+                    finalTopic = matchedMapping.topic;
                 } else {
                     // Fallback: Try to match just the topic if combo fails
-                    const topicMatch = approvedMappings.find(m => m.topic.toLowerCase().trim() === String(update.topic || '').toLowerCase().trim());
+                    const topicMatch = approvedMappings.find(m => m.topic.toLowerCase().trim() === String(newTopic).toLowerCase().trim());
                     if (topicMatch) {
-                        return { ...q, topic: topicMatch.topic, subject: topicMatch.subject };
+                        finalTopic = topicMatch.topic;
                     }
-                    return q; // Fallback to original if no match found
+                }
+
+                if (finalTopic) {
+                    if (!topicMappings[finalTopic]) {
+                        topicMappings[finalTopic] = [];
+                    }
+                    if (!topicMappings[finalTopic].includes(oldTopic)) {
+                        topicMappings[finalTopic].push(oldTopic);
+                    }
+                    mappedCount++;
                 }
             });
             
-            await upsertSupabaseData('questionbank', finalData);
-            const sheetRows = finalData.map(q => ({
-                id: String(q.id),
-                data: [q.id, q.topic, q.question, JSON.stringify(q.options), q.correct_answer_index, q.subject, q.difficulty, q.explanation]
-            }));
-            await batchUpsertRows('QuestionBank', sheetRows);
-            return { message: `Successfully normalized ${finalData.length} questions to approved syllabus topics.` };
+            // Save updated mappings
+            await upsertSupabaseData('settings', [{ key: 'topic_mappings', value: JSON.stringify(topicMappings) }], 'key');
+            
+            return { message: `Successfully normalized ${mappedCount} questions to approved syllabus topics.` };
         }
     } catch (e: any) {
         console.error("Normalize Topics Error:", e.message);

@@ -427,10 +427,13 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                 <div className="bg-slate-50 dark:bg-slate-900 rounded-[2.5rem] overflow-hidden border dark:border-slate-800 shadow-xl">
                                     <table className="w-full text-left">
                                         <thead className="bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase text-slate-500">
-                                            <tr><th className="px-8 py-5">Syllabus Topic</th><th className="px-8 py-5">Matched QB Topics</th><th className="px-8 py-5">Question Count</th><th className="px-8 py-5 text-right">Actions</th></tr>
+                                            <tr><th className="px-8 py-5">Syllabus Topic</th><th className="px-8 py-5">Mapped Micro-Topics</th><th className="px-8 py-5">Question Count</th><th className="px-8 py-5 text-right">Actions</th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                            {auditReport?.syllabusReport.map((report: any) => (
+                                            {auditReport?.syllabusReport.map((report: any) => {
+                                                const mappedMicroTopics = auditReport?.topicMappings?.[report.topic] || [];
+                                                const allTopics = Array.from(new Set([...(report.matchedTopics || []), ...mappedMicroTopics]));
+                                                return (
                                                 <tr key={report.id} className="text-sm font-bold">
                                                     <td className="px-8 py-6">
                                                         <p className="font-black text-sm text-slate-800 dark:text-slate-200">{report.topic}</p>
@@ -438,14 +441,14 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                     </td>
                                                     <td className="px-8 py-6">
                                                         <div className="flex flex-wrap gap-1">
-                                                            {report.matchedTopics && report.matchedTopics.length > 0 ? (
-                                                                report.matchedTopics.map((t: string) => (
+                                                            {allTopics.length > 0 ? (
+                                                                allTopics.map((t: any) => (
                                                                     <span key={t} className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded text-[9px] font-bold border border-blue-100">
                                                                         {t}
                                                                     </span>
                                                                 ))
                                                             ) : (
-                                                                <span className="text-[9px] text-slate-400 italic">No matches found</span>
+                                                                <span className="text-[9px] text-slate-400 italic">No mappings</span>
                                                             )}
                                                         </div>
                                                     </td>
@@ -460,7 +463,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                         </button>
                                                     </td>
                                                 </tr>
-                                            ))}
+                                            )})}
                                             {/* Total Row */}
                                             <tr className="bg-slate-50 dark:bg-slate-800/50 font-black">
                                                 <td className="px-8 py-6 uppercase tracking-widest text-[10px] text-slate-500">Total Classified Questions</td>

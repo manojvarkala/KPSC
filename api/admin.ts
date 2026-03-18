@@ -401,9 +401,18 @@ export default async function handler(req: any, res: any) {
                 
                 const totalQuestions = realTotalCount || qData?.length || 0;
                 
-                // 3. Fetch last audited ID
-                const { data: lastAuditedSetting } = await supabase.from('settings').select('value').eq('key', 'last_audited_id').single();
+                // 3. Fetch last audited ID and topic mappings
+                const { data: lastAuditedSetting } = await supabase.from('settings').select('value').eq('key', 'last_audited_id').maybeSingle();
                 const lastAuditedId = parseInt(lastAuditedSetting?.value || '0');
+
+                const { data: mappingSetting } = await supabase.from('settings').select('value').eq('key', 'topic_mappings').maybeSingle();
+                let topicMappings: Record<string, string[]> = {};
+                if (mappingSetting && mappingSetting.value) {
+                    try { topicMappings = JSON.parse(mappingSetting.value); } catch (e) {}
+                }
+                // Flatten mappings to a set of all mapped micro-topics
+                const mappedMicroTopics = new Set<string>();
+                Object.values(topicMappings).forEach(list => list.forEach(t => mappedMicroTopics.add(t.toLowerCase().trim())));
 
                 // 4. Prepare syllabus mapping for matching
                 const syllabusMappings = (sData || []).map(s => {
@@ -431,9 +440,22 @@ export default async function handler(req: any, res: any) {
                     const sLower = s.toLowerCase();
                     const t = String(q.topic || '').trim();
                     const tLower = t.toLowerCase();
-                    const composite = `${sLower}|${tLower}`;
+                    
+                    let effectiveTopicLower = tLower;
+                    
+                    // Check if the topic is a mapped micro-topic
+                    if (mappedMicroTopics.has(tLower)) {
+                        for (const [sTopic, mTopics] of Object.entries(topicMappings)) {
+                            if (mTopics.map(mt => mt.toLowerCase().trim()).includes(tLower)) {
+                                effectiveTopicLower = sTopic.toLowerCase().trim();
+                                break;
+                            }
+                        }
+                    }
 
-                    const isTopicInSyllabus = syllabusTopicsLower.includes(tLower);
+                    const composite = `${sLower}|${effectiveTopicLower}`;
+
+                    const isTopicInSyllabus = syllabusTopicsLower.includes(effectiveTopicLower);
                     const isComboValid = syllabusComposites.has(composite);
                     const isSubjectApproved = approvedLower.includes(sLower);
 
@@ -500,12 +522,15 @@ export default async function handler(req: any, res: any) {
                     }
                     
                     const matchedTopics = new Set<string>();
+                    const matchingKey = Object.keys(topicMappings).find(k => k.toLowerCase() === sTopic);
+                    const mappedMicroTopicsForThisSyllabusTopic = matchingKey ? (topicMappings[matchingKey] || []).map(t => t.toLowerCase().trim()) : [];
                     const matchedQs = qData?.filter(q => {
                         const qTopic = String(q.topic || '').toLowerCase().trim();
                         const qSubject = String(q.subject || '').toLowerCase().trim();
                         
-                        // Must match BOTH subject and topic exactly
-                        const isMatch = qTopic === sTopic && qSubject === sSubject;
+                        // Must match BOTH subject and topic exactly, OR topic is a mapped micro-topic
+                        const isTopicMatch = qTopic === sTopic || mappedMicroTopicsForThisSyllabusTopic.includes(qTopic);
+                        const isMatch = isTopicMatch && qSubject === sSubject;
                         if (isMatch && qTopic) matchedTopics.add(q.topic);
                         return isMatch;
                     }) || [];
@@ -530,7 +555,8 @@ export default async function handler(req: any, res: any) {
                     subjectMismatches,
                     unapprovedTopics,
                     lastAuditedId,
-                    approvedSubjects: APPROVED_SUBJECTS
+                    approvedSubjects: APPROVED_SUBJECTS,
+                    topicMappings
                 });
             }
             case 'delete-row': await deleteRowById(sheet, id); if (supabase) await deleteSupabaseRow(sheet, id); return res.status(200).json({ message: 'Item deleted.' });
