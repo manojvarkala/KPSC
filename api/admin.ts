@@ -300,6 +300,38 @@ export default async function handler(req: any, res: any) {
                 return res.status(200).json({ message: `Repaired options for ${updates.length} questions.` });
             }
 
+            case 'setup-teacher-exams': {
+                if (!supabase) throw new Error("Supabase required.");
+                
+                const teacherExams = [
+                    { id: 'hsst_sanskrit', title_en: 'HSST Sanskrit', title_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - സംസ്കൃതം', level: 'HSST', category: 'Teaching', description_en: 'Higher Secondary School Teacher - Sanskrit', description_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - സംസ്കൃതം', icon_type: 'book' },
+                    { id: 'hsst_english', title_en: 'HSST English', title_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - ഇംഗ്ലീഷ്', level: 'HSST', category: 'Teaching', description_en: 'Higher Secondary School Teacher - English', description_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - ഇംഗ്ലീഷ്', icon_type: 'book' },
+                    { id: 'hsst_kannada', title_en: 'HSST Kannada', title_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - കന്നഡ', level: 'HSST', category: 'Teaching', description_en: 'Higher Secondary School Teacher - Kannada', description_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - കന്നഡ', icon_type: 'book' },
+                    { id: 'hsst_sociology', title_en: 'HSST Sociology', title_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - സോഷ്യോളജി', level: 'HSST', category: 'Teaching', description_en: 'Higher Secondary School Teacher - Sociology', description_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - സോഷ്യോളജി', icon_type: 'book' },
+                    { id: 'hsst_statistics', title_en: 'HSST Statistics', title_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - സ്റ്റാറ്റിസ്റ്റിക്സ്', level: 'HSST', category: 'Teaching', description_en: 'Higher Secondary School Teacher - Statistics', description_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - സ്റ്റാറ്റിസ്റ്റിക്സ്', icon_type: 'book' },
+                    { id: 'hsst_political_science', title_en: 'HSST Political Science', title_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - പൊളിറ്റിക്കൽ സയൻസ്', level: 'HSST', category: 'Teaching', description_en: 'Higher Secondary School Teacher - Political Science', description_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - പൊളിറ്റിക്കൽ സയൻസ്', icon_type: 'book' },
+                    { id: 'hsst_economics', title_en: 'HSST Economics', title_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - എക്കണോമിക്സ്', level: 'HSST', category: 'Teaching', description_en: 'Higher Secondary School Teacher - Economics', description_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - എക്കണോമിക്സ്', icon_type: 'book' },
+                    { id: 'hsst_botany', title_en: 'HSST Botany', title_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - ബോട്ടണി', level: 'HSST', category: 'Teaching', description_en: 'Higher Secondary School Teacher - Botany', description_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - ബോട്ടണി', icon_type: 'book' },
+                    { id: 'hsst_zoology', title_en: 'HSST Zoology', title_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - സൂയോളജി', level: 'HSST', category: 'Teaching', description_en: 'Higher Secondary School Teacher - Zoology', description_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - സൂയോളജി', icon_type: 'book' },
+                    { id: 'hsst_geography', title_en: 'HSST Geography', title_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - ജിയോഗ്രഫി', level: 'HSST', category: 'Teaching', description_en: 'Higher Secondary School Teacher - Geography', description_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - ജിയോഗ്രഫി', icon_type: 'book' },
+                    { id: 'hsst_chemistry', title_en: 'HSST Chemistry', title_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - കെമിസ്ട്രി', level: 'HSST', category: 'Teaching', description_en: 'Higher Secondary School Teacher - Chemistry', description_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - കെമിസ്ട്രി', icon_type: 'book' },
+                    { id: 'hsst_mathematics', title_en: 'HSST Mathematics', title_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - മാത്തമാറ്റിക്സ്', level: 'HSST', category: 'Teaching', description_en: 'Higher Secondary School Teacher - Mathematics', description_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - മാത്തമാറ്റിക്സ്', icon_type: 'book' },
+                    { id: 'hsst_physics', title_en: 'HSST Physics', title_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - ഫിസിക്സ്', level: 'HSST', category: 'Teaching', description_en: 'Higher Secondary School Teacher - Physics', description_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - ഫിസിക്സ്', icon_type: 'book' },
+                    { id: 'lp_up_assistant', title_en: 'LP/UP Assistant', title_ml: 'എൽ.പി/യു.പി അസിസ്റ്റന്റ്', level: 'Teaching', category: 'Teaching', description_en: 'LP/UP Assistant Teacher Exam', description_ml: 'എൽ.പി/യു.പി അസിസ്റ്റന്റ് പരീക്ഷ', icon_type: 'book' },
+                    { id: 'hsst_general', title_en: 'HSST (General)', title_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ', level: 'HSST', category: 'Teaching', description_en: 'Higher Secondary School Teacher - General', description_ml: 'ഹയർ സെക്കൻഡറി സ്കൂൾ ടീച്ചർ - ജനറൽ', icon_type: 'book' }
+                ];
+
+                await upsertSupabaseData('exams', teacherExams, 'id');
+
+                for (const exam of teacherExams) {
+                    await generateSyllabusForExam(exam);
+                }
+
+                await syncSupabaseToSheets();
+
+                return res.status(200).json({ message: `Successfully set up ${teacherExams.length} teacher exams and generated their syllabus.` });
+            }
+
             case 'run-all-gaps': {
                 if (!supabase) throw new Error("Supabase required.");
                 const { data: sData } = await supabase.from('syllabus').select('id, topic, title, subject');

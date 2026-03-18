@@ -604,9 +604,14 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             <div className="space-y-8 animate-fade-in">
                                 <div className="flex justify-between items-center">
                                     <h3 className="text-2xl font-black uppercase tracking-tight">Exams Manager</h3>
-                                    <button onClick={() => setEditingExam({ id: '', title_ml: '', title_en: '', description_ml: '', description_en: '', category: 'General', level: 'Preliminary', icon_type: 'cap' })} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center space-x-2 shadow-lg">
-                                        <PlusIcon className="h-4 w-4" /><span>Add Exam</span>
-                                    </button>
+                                    <div className="flex space-x-3">
+                                        <button onClick={() => handleAction('setup-teacher-exams')} className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center space-x-2 shadow-lg hover:bg-emerald-700 transition-all">
+                                            <SparklesIcon className="h-4 w-4" /><span>Setup Teacher Exams</span>
+                                        </button>
+                                        <button onClick={() => setEditingExam({ id: '', title_ml: '', title_en: '', description_ml: '', description_en: '', category: 'General', level: 'Preliminary', icon_type: 'cap' })} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center space-x-2 shadow-lg">
+                                            <PlusIcon className="h-4 w-4" /><span>Add Exam</span>
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {exams.map(ex => (

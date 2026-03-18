@@ -22,12 +22,22 @@ export async function upsertSupabaseData(table: string, data: any[], onConflict:
         
         // Define tables with integer IDs
         const intIdTables = ['questionbank', 'results', 'liveupdates', 'syllabus'];
-        if (intIdTables.includes(cleanTable) && entry.id !== undefined && entry.id !== null) {
-            const parsedId = parseInt(String(entry.id));
-            if (isNaN(parsedId)) {
-                delete entry.id; // Let DB handle it if it's not a valid number
-            } else {
-                entry.id = parsedId;
+        if (intIdTables.includes(cleanTable)) {
+            if (entry.id !== undefined && entry.id !== null && entry.id !== '') {
+                const parsedId = parseInt(String(entry.id));
+                if (!isNaN(parsedId)) {
+                    entry.id = parsedId;
+                } else {
+                    // If it's a string but the table expects an int, we need a deterministic numeric ID
+                    if (cleanTable === 'syllabus' && entry.exam_id && entry.topic) {
+                        entry.id = generateDeterministicIntId(`${entry.exam_id}_${entry.topic}`);
+                    } else {
+                        delete entry.id;
+                    }
+                }
+            } else if (cleanTable === 'syllabus' && entry.exam_id && entry.topic) {
+                // Generate ID for syllabus if missing
+                entry.id = generateDeterministicIntId(`${entry.exam_id}_${entry.topic}`);
             }
         } else if (entry.id !== undefined && entry.id !== null) {
             entry.id = String(entry.id).trim();
@@ -64,18 +74,9 @@ export async function upsertSupabaseData(table: string, data: any[], onConflict:
         if (pkValue !== undefined && pkValue !== null && pkValue !== '') {
             uniqueMap.set(pkValue, item);
         } else {
-            // For items without a PK, we can try to find a natural key to deduplicate within the batch
-            // but we DON'T set it as the 'id' field because 'id' might be an integer/smallint
-            let naturalKey = null;
-            if (cleanTable === 'syllabus' && item.exam_id && item.topic) {
-                naturalKey = `syllabus_${item.exam_id}_${item.topic}`;
-            }
-            
-            if (naturalKey) {
-                uniqueMap.set(naturalKey, item);
-            } else {
-                noPkItems.push(item);
-            }
+            // For items without a PK, we've already tried to generate one in the mapping step
+            // If it's still missing, we just add it to the batch
+            noPkItems.push(item);
         }
     });
     
@@ -92,6 +93,18 @@ export async function upsertSupabaseData(table: string, data: any[], onConflict:
         throw new Error(`Supabase Error: ${error.message}`);
     }
     return result;
+}
+
+function generateDeterministicIntId(str: string): number {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    // Return a positive number within smallint range (1 to 32767)
+    // We use 1-based to avoid 0 which might be treated as null/false in some contexts
+    return Math.abs(hash % 32760) + 1;
 }
 
 export async function fetchAllSupabaseData(table: string, select: string = '*') {
