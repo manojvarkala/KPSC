@@ -529,17 +529,34 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                 <h3 className="text-2xl font-black uppercase tracking-tight">App Configuration</h3>
                                 <div className="space-y-6">
                                     {/* Special Toggle for Free Pro Mode */}
-                                    <div className="bg-indigo-50 dark:bg-indigo-900/20 p-8 rounded-[2.5rem] border border-indigo-100 dark:border-indigo-800 flex items-center justify-between gap-6 shadow-xl shadow-indigo-500/5">
-                                        <div>
-                                            <h4 className="text-lg font-black uppercase tracking-tight text-indigo-900 dark:text-indigo-100">Free Pro Mode</h4>
-                                            <p className="text-xs font-bold text-indigo-600/70 mt-1">When enabled, all users get Pro features for free.</p>
+                                    <div className="bg-indigo-50 dark:bg-indigo-900/20 p-8 rounded-[2.5rem] border border-indigo-100 dark:border-indigo-800 flex flex-col gap-6 shadow-xl shadow-indigo-500/5">
+                                        <div className="flex items-center justify-between gap-6">
+                                            <div>
+                                                <h4 className="text-lg font-black uppercase tracking-tight text-indigo-900 dark:text-indigo-100">Free Pro Mode</h4>
+                                                <p className="text-xs font-bold text-indigo-600/70 mt-1">When enabled, all users get Pro features for free.</p>
+                                            </div>
+                                            <button 
+                                                onClick={() => updateSetting('free_pro_mode', settings.free_pro_mode === 'true' ? 'false' : 'true')}
+                                                className={`w-20 h-10 rounded-full p-1 transition-all duration-500 ${settings.free_pro_mode === 'true' ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                            >
+                                                <div className={`w-8 h-8 bg-white rounded-full shadow-lg transform transition-transform duration-500 ${settings.free_pro_mode === 'true' ? 'translate-x-10' : 'translate-x-0'}`} />
+                                            </button>
                                         </div>
-                                        <button 
-                                            onClick={() => updateSetting('free_pro_mode', settings.free_pro_mode === 'true' ? 'false' : 'true')}
-                                            className={`w-20 h-10 rounded-full p-1 transition-all duration-500 ${settings.free_pro_mode === 'true' ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
-                                        >
-                                            <div className={`w-8 h-8 bg-white rounded-full shadow-lg transform transition-transform duration-500 ${settings.free_pro_mode === 'true' ? 'translate-x-10' : 'translate-x-0'}`} />
-                                        </button>
+                                        
+                                        <div className="h-px bg-indigo-200 dark:bg-indigo-800/50 w-full" />
+                                        
+                                        <div className="flex items-center justify-between gap-6">
+                                            <div>
+                                                <h4 className="text-lg font-black uppercase tracking-tight text-indigo-900 dark:text-indigo-100">Subscription Model</h4>
+                                                <p className="text-xs font-bold text-indigo-600/70 mt-1">When disabled, the app ignores user subscriptions and uses the Pro toggle above.</p>
+                                            </div>
+                                            <button 
+                                                onClick={() => updateSetting('subscription_model_active', settings.subscription_model_active === 'true' ? 'false' : 'true')}
+                                                className={`w-20 h-10 rounded-full p-1 transition-all duration-500 ${settings.subscription_model_active === 'true' ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                            >
+                                                <div className={`w-8 h-8 bg-white rounded-full shadow-lg transform transition-transform duration-500 ${settings.subscription_model_active === 'true' ? 'translate-x-10' : 'translate-x-0'}`} />
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-xl">

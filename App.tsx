@@ -46,8 +46,9 @@ const App: React.FC = () => {
   const [testResult, setTestResult] = useState<{ score: number; total: number; stats?: any; questions?: QuizQuestion[]; answers?: UserAnswers } | null>(null);
   const [activeStudyTopic, setActiveStudyTopic] = useState<string | null>(null);
   const [externalUrl, setExternalUrl] = useState<string | null>(null);
-  const [settings, setSettings] = useState<any>({});
+  const [settings, setSettings] = useState<any>({ subscription_model_active: 'true', free_pro_mode: 'false' });
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>('free');
+  const [hitCount, setHitCount] = useState<number>(12345);
   const { theme } = useTheme();
 
   const isInitialized = useRef(false);
@@ -60,6 +61,13 @@ const App: React.FC = () => {
               const [s, eRes] = await Promise.all([getSettings(), getExams()]);
               if (s) setSettings(s);
               if (eRes && eRes.exams && eRes.exams.length > 0) setAllExams(eRes.exams);
+              
+              // Increment hit counter
+              const hitRes = await fetch('/api/hitcounter');
+              if (hitRes.ok) {
+                  const data = await hitRes.json();
+                  setHitCount(data.count);
+              }
           } catch (e) { console.error(e); }
       };
       initData();
@@ -122,16 +130,34 @@ const App: React.FC = () => {
   }, [syncStateFromHash, isAppLoading]);
 
   useEffect(() => {
-    if (settings.subscription_model_active === 'false' || settings.free_pro_mode === 'true') { setSubscriptionStatus('pro'); return; }
-    const fetchSub = async () => {
-        if (isSignedIn && user?.id) {
-          const data = await subscriptionService.getSubscriptionData(user.id);
-          setSubscriptionStatus(data.status);
-        } else setSubscriptionStatus('free');
+    const determineStatus = async () => {
+        // If subscription model is disabled OR free pro mode is enabled, everyone is PRO
+        if (settings.subscription_model_active === 'false' || settings.free_pro_mode === 'true') {
+            setSubscriptionStatus('pro');
+            return;
+        }
+
+        // Otherwise, check user's actual subscription
+        if (clerkLoaded) {
+            if (isSignedIn && user?.id) {
+                try {
+                    const data = await subscriptionService.getSubscriptionData(user.id);
+                    setSubscriptionStatus(data.status);
+                } catch (e) {
+                    console.error("Failed to fetch subscription:", e);
+                    setSubscriptionStatus('free');
+                }
+            } else {
+                setSubscriptionStatus('free');
+            }
+        }
     };
-    if (clerkLoaded) fetchSub();
-    window.addEventListener('subscription_updated', fetchSub);
-    return () => window.removeEventListener('subscription_updated', fetchSub);
+
+    determineStatus();
+    
+    const handleSubUpdate = () => determineStatus();
+    window.addEventListener('subscription_updated', handleSubUpdate);
+    return () => window.removeEventListener('subscription_updated', handleSubUpdate);
   }, [user, isSignedIn, settings, clerkLoaded]);
 
   const handleNavigate = (page: string) => {
@@ -175,7 +201,7 @@ const App: React.FC = () => {
           }
         })()}
       </main>
-      {!isFullPage && <Footer onNavigate={handleNavigate as any}/>}
+      {!isFullPage && <Footer onNavigate={handleNavigate as any} hitCount={hitCount} />}
     </div>
   );
 };

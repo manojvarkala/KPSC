@@ -1018,7 +1018,7 @@ async function processNormalizationBatch(toRepair: any[], approvedMappings: { to
         });
         
         const updates = JSON.parse(response.text || "[]");
-        if (updates.length > 0) {
+        if (updates.length > 0 && supabase) {
             // Fetch existing topic mappings
             const { data: mappingData } = await supabase.from('settings').select('value').eq('key', 'topic_mappings').maybeSingle();
             let topicMappings: Record<string, string[]> = {};

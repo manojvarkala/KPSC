@@ -6,9 +6,10 @@ import { useTranslation } from '../contexts/LanguageContext';
 
 interface FooterProps {
   onNavigate: (page: Page) => void;
+  hitCount?: number;
 }
 
-const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
+const Footer: React.FC<FooterProps> = ({ onNavigate, hitCount }) => {
   const { t } = useTranslation();
 
   const footerLinks: { nameKey: string, target: Page }[] = [
@@ -68,10 +69,18 @@ const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             </a>
           </div>
         </div>
-        <div className="mt-8 border-t border-slate-700 pt-6 text-center">
+        <div className="mt-8 border-t border-slate-700 pt-6 text-center flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-xs text-slate-500">
               &copy; {new Date().getFullYear()} {t('app.title')} | {t('footer.copyright')}
             </p>
+            {hitCount !== undefined && (
+              <div className="flex items-center space-x-2 bg-slate-900/50 px-4 py-1.5 rounded-full border border-slate-700/50 shadow-inner">
+                <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Visitors</span>
+                <span className="text-xs font-black text-indigo-400 font-mono tracking-tighter">
+                  {String(hitCount).padStart(6, '0')}
+                </span>
+              </div>
+            )}
         </div>
       </div>
     </footer>

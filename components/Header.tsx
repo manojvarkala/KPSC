@@ -28,6 +28,7 @@ const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [isSubActive, setIsSubActive] = useState(true);
+  const [isFreePro, setIsFreePro] = useState(false);
   const [subData, setSubData] = useState<SubscriptionData | null>(null);
   
   const { isLoaded, isSignedIn, user } = useUser();
@@ -38,11 +39,25 @@ const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
   }, [user]);
 
   useEffect(() => {
-    getSettings().then(s => {
-        if (s && s.subscription_model_active !== undefined) {
-            setIsSubActive(String(s.subscription_model_active) === 'true');
-        }
-    }).catch(() => setIsSubActive(true));
+    const refreshSettings = () => {
+        getSettings().then(s => {
+            if (s) {
+                if (s.subscription_model_active !== undefined) {
+                    setIsSubActive(String(s.subscription_model_active) === 'true');
+                }
+                if (s.free_pro_mode !== undefined) {
+                    setIsFreePro(String(s.free_pro_mode) === 'true');
+                }
+            }
+        }).catch(() => {
+            setIsSubActive(true);
+            setIsFreePro(false);
+        });
+    };
+
+    refreshSettings();
+    window.addEventListener('settings_updated', refreshSettings);
+    return () => window.removeEventListener('settings_updated', refreshSettings);
   }, [isSignedIn]);
 
   useEffect(() => {
@@ -102,7 +117,7 @@ const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
       return <div className="h-10 w-24 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse"></div>;
     }
 
-    const isPro = subData?.status === 'pro' || !isSubActive;
+    const isPro = subData?.status === 'pro' || !isSubActive || isFreePro;
 
     if (isSignedIn) {
       return (
@@ -138,7 +153,7 @@ const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
   return (
     <div className="flex flex-col w-full sticky top-0 z-50">
       {/* Global Pro Free Banner */}
-      {!isSubActive && (
+      {(!isSubActive || isFreePro) && (
           <div className="bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-600 text-white py-2.5 px-4 text-center animate-fade-in flex items-center justify-center space-x-4 shadow-xl border-b border-white/10">
               <SparklesIcon className="h-4 w-4 text-emerald-200 animate-pulse hidden sm:block" />
               <p className="text-[10px] md:text-xs font-black uppercase tracking-[0.15em] drop-shadow-sm">
