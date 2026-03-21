@@ -755,7 +755,7 @@ export async function runBookScraper() {
         const items = JSON.parse(response.text || "[]");
         if (items.length > 0) {
             const finalItems = items.map((it: any) => ({ 
-                id: it.asin || createNumericHash(it.title),
+                id: it.asin ? createNumericHash(it.asin) : createNumericHash(it.title),
                 title: it.title, author: it.author, 
                 imageUrl: it.asin ? `https://images-na.ssl-images-amazon.com/images/P/${it.asin.toUpperCase()}.01._SCLZZZZZZZ_SX400_.jpg` : "", 
                 amazonLink: it.amazonLink + (it.amazonLink.includes('?') ? '&' : '?') + AFFILIATE_TAG 

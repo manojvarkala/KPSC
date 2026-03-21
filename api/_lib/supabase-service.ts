@@ -21,7 +21,7 @@ export async function upsertSupabaseData(table: string, data: any[], onConflict:
         const entry: any = { ...item };
         
         // Define tables with integer IDs
-        const intIdTables = ['questionbank', 'results', 'liveupdates', 'syllabus'];
+        const intIdTables = ['questionbank', 'results', 'liveupdates', 'syllabus', 'bookstore'];
         if (intIdTables.includes(cleanTable)) {
             if (entry.id !== undefined && entry.id !== null && entry.id !== '') {
                 const parsedId = parseInt(String(entry.id));
@@ -31,6 +31,8 @@ export async function upsertSupabaseData(table: string, data: any[], onConflict:
                     // If it's a string but the table expects an int, we need a deterministic numeric ID
                     if (cleanTable === 'syllabus' && entry.exam_id && entry.topic) {
                         entry.id = generateDeterministicIntId(`${entry.exam_id}_${entry.topic}`);
+                    } else if (cleanTable === 'bookstore') {
+                        entry.id = generateDeterministicIntId(String(entry.id), true);
                     } else {
                         delete entry.id;
                     }
@@ -95,13 +97,18 @@ export async function upsertSupabaseData(table: string, data: any[], onConflict:
     return result;
 }
 
-function generateDeterministicIntId(str: string): number {
+function generateDeterministicIntId(str: string, fullRange: boolean = false): number {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
         const char = str.charCodeAt(i);
         hash = ((hash << 5) - hash) + char;
         hash = hash & hash; // Convert to 32bit integer
     }
+    
+    if (fullRange) {
+        return Math.abs(hash);
+    }
+    
     // Return a positive number within smallint range (1 to 32767)
     // We use 1-based to avoid 0 which might be treated as null/false in some contexts
     return Math.abs(hash % 32760) + 1;
@@ -141,8 +148,8 @@ export async function fetchAllSupabaseData(table: string, select: string = '*') 
 export async function deleteSupabaseRow(table: string, id: string) {
     if (!supabase) return null;
     const cleanTable = table.toLowerCase();
-    const intIdTables = ['questionbank', 'results', 'liveupdates', 'syllabus'];
-    const cleanId = intIdTables.includes(cleanTable) ? parseInt(id) : id;
+    const intIdTables = ['questionbank', 'results', 'liveupdates', 'syllabus', 'bookstore'];
+    const cleanId = intIdTables.includes(cleanTable) ? (isNaN(parseInt(id)) ? generateDeterministicIntId(id, cleanTable === 'bookstore') : parseInt(id)) : id;
     const { error } = await supabase.from(cleanTable).delete().eq('id', cleanId);
     if (error) throw error;
 }
