@@ -62,6 +62,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [syllabusItems, setSyllabusItems] = useState<PracticeTest[]>([]);
     const [auditReport, setAuditReport] = useState<AuditReport | null>(null);
     const [settings, setSettings] = useState<Record<string, string>>({});
+    const [csvText, setCsvText] = useState('');
     
     const updateSetting = async (key: string, value: string) => {
         try {
@@ -152,10 +153,59 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         try {
             const r = await adminOp(action, payload);
             setStatus(r.message || "Action completed successfully.");
-            if (['delete-row', 'rebuild-db', 'sync-to-sheets', 'run-daily-sync', 'run-book-scraper', 'update-setting', 'save-row', 'run-batch-qa', 'run-language-repair', 'run-topic-repair', 'run-explanation-repair', 'run-all-gaps', 'run-targeted-gap-fill', 'normalize-topics', 'normalize-subjects', 'repair-options', 'rebuild-syllabus', 'rebuild-hsst-syllabus'].includes(action)) {
+            if (['delete-row', 'rebuild-db', 'sync-to-sheets', 'run-daily-sync', 'run-book-scraper', 'update-setting', 'save-row', 'run-batch-qa', 'run-language-repair', 'run-topic-repair', 'run-explanation-repair', 'run-all-gaps', 'run-targeted-gap-fill', 'normalize-topics', 'normalize-subjects', 'repair-options', 'rebuild-syllabus', 'rebuild-hsst-syllabus', 'upload-questions'].includes(action)) {
                 await refreshData(true);
             }
         } catch(e:any) { setStatus(e.message); setIsError(true); }
+    };
+
+    const handleBulkUpload = async () => {
+        if (!csvText.trim()) return;
+        setLoading(true);
+        setStatus("Parsing CSV and uploading...");
+        setIsError(false);
+        try {
+            const lines = csvText.split('\n').filter(l => l.trim());
+            const questions = lines.map(line => {
+                const parts: string[] = [];
+                let current = '';
+                let inQuotes = false;
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        parts.push(current.trim());
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                parts.push(current.trim());
+
+                const idVal = parseInt(parts[0]);
+                return {
+                    id: isNaN(idVal) ? undefined : idVal,
+                    topic: parts[1] || 'General',
+                    question: parts[2],
+                    options: parts[3],
+                    correct_answer_index: parseInt(parts[4] || '0'),
+                    subject: parts[5] || 'General Knowledge',
+                    difficulty: parts[6] || 'Easy',
+                    explanation: parts[7] || ''
+                };
+            });
+
+            const res = await adminOp('upload-questions', { questions });
+            setStatus(res.message || 'Questions uploaded successfully');
+            setCsvText('');
+            await refreshData(true);
+        } catch (err: any) {
+            setIsError(true);
+            setStatus(err.message || 'Failed to upload questions');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleProcessAll = async (action: 'run-topic-repair' | 'normalize-topics') => {
@@ -370,6 +420,31 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                             </div>
                                         </div>
                                         <button onClick={() => handleAction('clean-database')} className="mt-6 w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-lg hover:bg-blue-700 transition-all text-[10px] uppercase tracking-widest">Clean Whitespace</button>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-xl">
+                                    <div className="flex items-center space-x-3 mb-6">
+                                        <CloudArrowUpIcon className="h-6 w-6 text-indigo-600" />
+                                        <h4 className="text-sm font-black uppercase tracking-tight text-slate-700 dark:text-slate-300">Bulk Upload Questions (CSV)</h4>
+                                    </div>
+                                    <p className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest leading-relaxed">
+                                        Format: "id","topic","question","options (pipe separated)","correct_index","subject","difficulty","explanation"
+                                    </p>
+                                    <textarea 
+                                        value={csvText}
+                                        onChange={(e) => setCsvText(e.target.value)}
+                                        placeholder='Example: "1","History","Who is the first Governor General?","Warren Hastings|Dalhousie|Cornwallis|Clive","0","General Knowledge","Easy","Warren Hastings was the first."'
+                                        className="w-full h-48 p-6 rounded-3xl border-2 border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-mono text-xs mb-6 focus:border-indigo-500 outline-none transition-all"
+                                    />
+                                    <div className="flex justify-end">
+                                        <button 
+                                            onClick={handleBulkUpload}
+                                            disabled={!csvText.trim() || loading}
+                                            className="bg-indigo-600 text-white font-black py-4 px-12 rounded-2xl shadow-lg hover:bg-indigo-700 transition-all text-[10px] uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {loading ? 'Uploading...' : 'Upload Questions'}
+                                        </button>
                                     </div>
                                 </div>
 
