@@ -89,9 +89,15 @@ export async function bulkUploadQuestions(questions: any[]) {
     }));
 
     await upsertSupabaseData('questionbank', sanitized);
-    for (const q of sanitized) {
-        await findAndUpsertRow('QuestionBank', String(q.id), [q.id, q.topic, q.question, JSON.stringify(q.options), q.correct_answer_index, q.subject, q.difficulty, q.explanation]);
-    }
+    
+    // Batch upsert to Google Sheets to avoid quota limits
+    const rowsToUpsert = sanitized.map(q => ({
+        id: String(q.id),
+        data: [q.id, q.topic, q.question, JSON.stringify(q.options), q.correct_answer_index, q.subject, q.difficulty, q.explanation]
+    }));
+    
+    await batchUpsertRows('QuestionBank', rowsToUpsert);
+    
     return { message: `Successfully uploaded ${sanitized.length} questions.` };
 }
 
@@ -115,7 +121,13 @@ export async function backfillExplanations() {
         if (updates.length > 0) {
             const finalData = missing.map(q => ({ ...q, explanation: updates.find((u: any) => u.id == q.id)?.explanation || q.explanation }));
             await upsertSupabaseData('questionbank', finalData);
-            for (const q of finalData) await findAndUpsertRow('QuestionBank', String(q.id), [q.id, q.topic, q.question, JSON.stringify(q.options), q.correct_answer_index, q.subject, q.difficulty, q.explanation]);
+            
+            const rowsToUpsert = finalData.map(q => ({
+                id: String(q.id),
+                data: [q.id, q.topic, q.question, JSON.stringify(q.options), q.correct_answer_index, q.subject, q.difficulty, q.explanation]
+            }));
+            await batchUpsertRows('QuestionBank', rowsToUpsert);
+            
             return { message: `Successfully added explanations to ${finalData.length} questions.` };
         }
     } catch (e: any) { throw e; }
@@ -297,9 +309,12 @@ export async function generateFlashCards(batchSize: number = 5) {
                     throw err;
                 }
             }
-            for (const f of sbData) {
-                await findAndUpsertRow('FlashCards', String(f.id), [f.id, f.front, f.back, f.topic, f.explanation]);
-            }
+            const rowsToUpsert = sbData.map((f: any) => ({
+                id: String(f.id),
+                data: [f.id, f.front, f.back, f.topic, f.explanation]
+            }));
+            await batchUpsertRows('FlashCards', rowsToUpsert);
+            
             return { message: `Generated ${sbData.length} flashcards.` };
         }
     } catch (e: any) { throw e; }
@@ -625,7 +640,11 @@ export async function scrapeGkFacts() {
         if (items.length > 0) {
             const sbData = items.map((it: any) => ({ id: createNumericHash(it.fact), fact: it.fact, category: it.category }));
             await upsertSupabaseData('gk', sbData);
-            for (const it of sbData) await findAndUpsertRow('GK', String(it.id), [it.id, it.fact, it.category]);
+            const rowsToUpsert = sbData.map((it: any) => ({
+                id: String(it.id),
+                data: [it.id, it.fact, it.category]
+            }));
+            await batchUpsertRows('GK', rowsToUpsert);
         }
     } catch (e: any) { throw e; }
 }
@@ -657,7 +676,11 @@ export async function scrapeCurrentAffairs() {
         if (items.length > 0) {
             const sbData = items.map((it: any) => ({ id: createNumericHash(it.title), title: it.title, source: it.source, date: it.date }));
             await upsertSupabaseData('currentaffairs', sbData);
-            for (const it of sbData) await findAndUpsertRow('CurrentAffairs', String(it.id), [it.id, it.title, it.source, it.date]);
+            const rowsToUpsert = sbData.map((it: any) => ({
+                id: String(it.id),
+                data: [it.id, it.title, it.source, it.date]
+            }));
+            await batchUpsertRows('CurrentAffairs', rowsToUpsert);
         }
     } catch (e: any) { throw e; }
 }
@@ -690,7 +713,11 @@ export async function scrapeKpscNotifications() {
         if (items.length > 0) {
             const sbData = items.map((it: any) => ({ ...it, id: createNumericHash(it.categoryNumber || it.title) }));
             await upsertSupabaseData('notifications', sbData);
-            for (const it of sbData) await findAndUpsertRow('Notifications', String(it.id), [it.id, it.title, it.categoryNumber, it.lastDate, it.link]);
+            const rowsToUpsert = sbData.map((it: any) => ({
+                id: String(it.id),
+                data: [it.id, it.title, it.categoryNumber, it.lastDate, it.link]
+            }));
+            await batchUpsertRows('Notifications', rowsToUpsert);
         }
     } catch (e: any) { throw e; }
 }
@@ -723,7 +750,11 @@ export async function scrapePscLiveUpdates() {
         if (items.length > 0) {
             const sbData = items.map((it: any) => ({ id: createNumericHash(it.url || it.title), title: it.title, url: it.url, section: it.section, published_date: it.published_date }));
             await upsertSupabaseData('liveupdates', sbData);
-            for (const it of sbData) await findAndUpsertRow('LiveUpdates', String(it.id), [it.title, it.url, it.section, it.published_date]);
+            const rowsToUpsert = sbData.map((it: any) => ({
+                id: String(it.id),
+                data: [it.title, it.url, it.section, it.published_date]
+            }));
+            await batchUpsertRows('LiveUpdates', rowsToUpsert);
         }
     } catch (e: any) { throw e; }
 }
@@ -761,7 +792,11 @@ export async function runBookScraper() {
                 amazonLink: it.amazonLink + (it.amazonLink.includes('?') ? '&' : '?') + AFFILIATE_TAG 
             }));
             await upsertSupabaseData('bookstore', finalItems);
-            for (const it of finalItems) await findAndUpsertRow('Bookstore', String(it.id), [it.id, it.title, it.author, it.imageUrl, it.amazonLink]);
+            const rowsToUpsert = finalItems.map((it: any) => ({
+                id: String(it.id),
+                data: [it.id, it.title, it.author, it.imageUrl, it.amazonLink]
+            }));
+            await batchUpsertRows('Bookstore', rowsToUpsert);
         }
     } catch (e: any) { throw e; }
 }
@@ -782,9 +817,11 @@ export async function repairLanguageMismatches() {
         const repaired = JSON.parse(response.text || "[]");
         if (repaired.length > 0) {
             await upsertSupabaseData('questionbank', repaired);
-            for (const q of repaired) {
-                await findAndUpsertRow('QuestionBank', String(q.id), [q.id, q.topic, q.question, JSON.stringify(q.options), q.correct_answer_index, q.subject, q.difficulty, q.explanation]);
-            }
+            const rowsToUpsert = repaired.map((q: any) => ({
+                id: String(q.id),
+                data: [q.id, q.topic, q.question, JSON.stringify(q.options), q.correct_answer_index, q.subject, q.difficulty, q.explanation]
+            }));
+            await batchUpsertRows('QuestionBank', rowsToUpsert);
         }
     } catch (e: any) { throw e; }
     return { message: "Language repair batch finished." };

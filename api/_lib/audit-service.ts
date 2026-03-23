@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { findAndUpsertRow } from './sheets-service.js';
+import { findAndUpsertRow, batchUpsertRows } from './sheets-service.js';
 import { supabase, upsertSupabaseData } from './supabase-service.js';
 import { APPROVED_SUBJECTS, APPROVED_TOPICS } from './scraper-service.js';
 import { smartParseOptions } from './utils.js';
@@ -104,13 +104,15 @@ export async function auditAndCorrectQuestions() {
                     throw err;
                 }
             }
-            for (const q of updates) {
+            const rowsToUpsert = updates.map((q: any) => {
                 const originalQ = questions.find(oq => oq.id === q.id);
                 const finalTopic = q.topic || originalQ?.topic || 'General';
-                await findAndUpsertRow('QuestionBank', String(q.id), [
-                    q.id, finalTopic, q.question, JSON.stringify(q.options), q.correct_answer_index, q.subject, q.difficulty || 'PSC Level', q.explanation
-                ]);
-            }
+                return {
+                    id: String(q.id),
+                    data: [q.id, finalTopic, q.question, JSON.stringify(q.options), q.correct_answer_index, q.subject, q.difficulty || 'PSC Level', q.explanation]
+                };
+            });
+            await batchUpsertRows('QuestionBank', rowsToUpsert);
             
             // Update the last audited ID
             const newLastId = Math.max(...updates.map((u: any) => u.id));
