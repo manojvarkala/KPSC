@@ -101,6 +101,25 @@ export async function bulkUploadQuestions(questions: any[]) {
     return { message: `Successfully uploaded ${sanitized.length} questions.` };
 }
 
+export async function bulkUploadMappings(mappings: any[]) {
+    if (!supabase) throw new Error("Supabase required.");
+    const mapped = mappings.map(r => ({
+        id: r.id ? parseInt(r.id) : undefined,
+        subject: r.subject,
+        topic: r.topic,
+        micro_topic: r.micro_topic
+    }));
+    await upsertSupabaseData('topic_mappings', mapped, 'id');
+    
+    const sheetRows = mapped.map(m => ({
+        id: String(m.id || ''),
+        data: [m.id, m.subject, m.topic, m.micro_topic]
+    }));
+    await batchUpsertRows('TopicMappings', sheetRows);
+    
+    return mapped;
+}
+
 /**
  * BACKFILL LOGIC: Repairs questions missing explanations
  */
@@ -941,7 +960,8 @@ export async function syncSupabaseToSheets() {
     const tables = [
         { name: 'Exams', table: 'exams', cols: ['id', 'title_ml', 'title_en', 'description_ml', 'description_en', 'category', 'level', 'icon_type'] },
         { name: 'QuestionBank', table: 'questionbank', cols: ['id', 'topic', 'question', 'options', 'correct_answer_index', 'subject', 'difficulty', 'explanation'] },
-        { name: 'Syllabus', table: 'syllabus', cols: ['id', 'exam_id', 'title', 'questions', 'duration', 'subject', 'topic'] },
+        { name: 'Syllabus', table: 'syllabus', cols: ['id', 'exam_id', 'title', 'questions', 'duration', 'subject', 'topic', 'micro_topics'] },
+        { name: 'TopicMappings', table: 'topic_mappings', cols: ['id', 'subject', 'topic', 'micro_topic'] },
         { name: 'Bookstore', table: 'bookstore', cols: ['id', 'title', 'author', 'imageUrl', 'amazonLink'] }
     ];
 
@@ -970,7 +990,9 @@ export async function normalizeTopics() {
     if (!supabase) throw new Error("Supabase required.");
     
     // 1. Get approved mappings from syllabus
-    const { data: sData } = await supabase.from('syllabus').select('topic, title, subject');
+    const { data: sData } = await supabase.from('syllabus').select('topic, title, subject, micro_topics');
+    const { data: mData } = await supabase.from('topic_mappings').select('*');
+    
     const approvedMappings = (sData || []).map(s => ({
         topic: s.topic || s.title || 'General',
         subject: s.subject || 'General Knowledge'
@@ -1000,34 +1022,65 @@ export async function normalizeTopics() {
     if (repairErr) throw repairErr;
     
     if (!toRepair || toRepair.length === 0) {
-        // If we couldn't fetch them, maybe they were deleted. Remove from TODO and return.
         const remainingIds = unmappedIds.filter(id => !batchIds.includes(id));
         await upsertSupabaseData('settings', [{ key: 'normalization_todo_ids', value: JSON.stringify(remainingIds) }], 'key');
         return { message: "Could not fetch questions to repair. Cleaned up stale IDs." };
     }
 
-    let totalNormalized = 0;
+    // 4. Try auto-mapping using the topic_mappings table first
+    const autoMapped: any[] = [];
+    const remainingToRepair: any[] = [];
+
+    toRepair.forEach(q => {
+        const tLower = String(q.topic || '').toLowerCase().trim();
+        const sLower = String(q.subject || '').toLowerCase().trim();
+
+        // Check mapping table
+        const mapping = (mData || []).find(m => m.micro_topic.toLowerCase().trim() === tLower);
+        if (mapping) {
+            autoMapped.push({ ...q, subject: mapping.subject, topic: mapping.topic });
+            return;
+        }
+
+        // Check manual micro-topics in syllabus
+        const syllabusMatch = (sData || []).find(s => 
+            String(s.micro_topics || '').toLowerCase().split(',').map(mt => mt.trim()).includes(tLower)
+        );
+        if (syllabusMatch) {
+            autoMapped.push({ ...q, subject: syllabusMatch.subject, topic: syllabusMatch.topic || syllabusMatch.title });
+            return;
+        }
+
+        remainingToRepair.push(q);
+    });
+
+    if (autoMapped.length > 0) {
+        await upsertSupabaseData('questionbank', autoMapped.map(q => ({ id: q.id, subject: q.subject, topic: q.topic })), 'id');
+    }
+
+    let totalNormalized = autoMapped.length;
     let totalFailed = 0;
 
-    // Process in smaller batches of 100 to avoid AI token limits
-    for (let i = 0; i < toRepair.length; i += 100) {
-        const smallBatch = toRepair.slice(i, i + 100);
-        const result = await processNormalizationBatch(smallBatch, approvedMappings);
-        
-        // Parse the result message to accumulate counts
-        const match = result.message.match(/normalized (\d+) questions/);
-        if (match) {
-            totalNormalized += parseInt(match[1]);
-        } else {
-            totalFailed += smallBatch.length;
+    // 5. Process remaining with AI
+    if (remainingToRepair.length > 0) {
+        for (let i = 0; i < remainingToRepair.length; i += 100) {
+            const smallBatch = remainingToRepair.slice(i, i + 100);
+            const result = await processNormalizationBatch(smallBatch, approvedMappings);
+            
+            const match = result.message.match(/normalized (\d+) questions/);
+            if (match) {
+                totalNormalized += parseInt(match[1]);
+            } else {
+                totalFailed += smallBatch.length;
+            }
         }
     }
 
-    // 4. Update TODO list
+    // 6. Update TODO list
     const remainingIds = unmappedIds.filter(id => !batchIds.includes(id));
     await upsertSupabaseData('settings', [{ key: 'normalization_todo_ids', value: JSON.stringify(remainingIds) }], 'key');
 
-    return { message: `Processed ${toRepair.length} questions. Normalized ${totalNormalized} topics. Failed to map ${totalFailed}.` };
+    return { message: `Processed ${toRepair.length} questions. Auto-mapped ${autoMapped.length}. AI-normalized ${totalNormalized - autoMapped.length}. Failed to map ${totalFailed}.` };
 }
 
 async function processNormalizationBatch(toRepair: any[], approvedMappings: { topic: string, subject: string }[]) {
@@ -1117,7 +1170,8 @@ export async function syncAllFromSheetsToSupabase() {
     if (!supabase) throw new Error("No Supabase.");
     const tables = [
         { sheet: 'Exams', supabase: 'exams', map: (r: any[]) => ({ id: r[0], title_ml: r[1], title_en: r[2], description_ml: r[3], description_en: r[4], category: r[5], level: r[6], icon_type: r[7] }) },
-        { sheet: 'Syllabus', supabase: 'syllabus', map: (r: any[]) => ({ id: r[0], exam_id: r[1], title: r[2], questions: parseInt(r[3] || '0'), duration: parseInt(r[4] || '0'), subject: r[5], topic: r[6] }) },
+        { sheet: 'Syllabus', supabase: 'syllabus', map: (r: any[]) => ({ id: r[0], exam_id: r[1], title: r[2], questions: parseInt(r[3] || '0'), duration: parseInt(r[4] || '0'), subject: r[5], topic: r[6], micro_topics: r[7] }) },
+        { sheet: 'TopicMappings', supabase: 'topic_mappings', map: (r: any[]) => ({ id: r[0] ? parseInt(r[0]) : undefined, subject: r[1], topic: r[2], micro_topic: r[3] }) },
         { sheet: 'QuestionBank', supabase: 'questionbank', map: (r: any[]) => ({ id: parseInt(r[0]), topic: r[1], question: r[2], options: smartParseOptions(r[3]), correct_answer_index: parseInt(r[4] || '1'), subject: r[5], difficulty: r[6], explanation: r[7] }) }
     ];
     for (const t of tables) {

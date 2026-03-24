@@ -29,9 +29,9 @@ import { LanguageIcon } from '../icons/LanguageIcon';
 import { TagIcon } from '../icons/TagIcon';
 import { CloudArrowUpIcon } from '../icons/CloudArrowUpIcon';
 import { UserGroupIcon } from '../icons/UserGroupIcon';
-import type { Exam, PracticeTest, Book } from '../../types';
+import type { Exam, PracticeTest, Book, TopicMapping } from '../../types';
 
-type AdminTab = 'automation' | 'qbank' | 'exams' | 'syllabus' | 'books' | 'users' | 'settings';
+type AdminTab = 'automation' | 'qbank' | 'exams' | 'syllabus' | 'mappings' | 'books' | 'users' | 'settings';
 
 interface AuditReport {
     syllabusReport: { id: string; topic: string; count: number }[];
@@ -60,6 +60,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [subscriptions, setSubscriptions] = useState<any[]>([]);
     const [selectedExamId, setSelectedExamId] = useState('');
     const [syllabusItems, setSyllabusItems] = useState<PracticeTest[]>([]);
+    const [topicMappings, setTopicMappings] = useState<TopicMapping[]>([]);
     const [auditReport, setAuditReport] = useState<AuditReport | null>(null);
     const [settings, setSettings] = useState<Record<string, string>>({});
     const [csvText, setCsvText] = useState('');
@@ -95,11 +96,18 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             
             // Only try to fetch full data if connection is at least partially online
             if (conn?.status?.sheets || conn?.status?.supabase) {
-                const [examRes, subs, bks, s] = await Promise.all([getExams(), getSubscriptions(), getBooks(), getSettings()]);
+                const [examRes, subs, bks, s, mappings] = await Promise.all([
+                    getExams(), 
+                    getSubscriptions(), 
+                    getBooks(), 
+                    getSettings(),
+                    adminOp('get-topic-mappings')
+                ]);
                 setExams(examRes.exams || []);
                 setSubscriptions(subs || []);
                 setBooks(bks || []);
                 if (s) setSettings(s);
+                setTopicMappings(mappings || []);
                 
                 if (activeTab === 'qbank') {
                     const report = await adminOp('get-audit-report');
@@ -153,7 +161,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         try {
             const r = await adminOp(action, payload);
             setStatus(r.message || "Action completed successfully.");
-            if (['delete-row', 'rebuild-db', 'sync-to-sheets', 'run-daily-sync', 'run-book-scraper', 'save-row', 'run-batch-qa', 'run-language-repair', 'run-topic-repair', 'run-explanation-repair', 'run-all-gaps', 'run-targeted-gap-fill', 'normalize-topics', 'normalize-subjects', 'repair-options', 'rebuild-syllabus', 'rebuild-hsst-syllabus', 'upload-questions'].includes(action)) {
+            if (['delete-row', 'rebuild-db', 'sync-to-sheets', 'run-daily-sync', 'run-book-scraper', 'save-row', 'run-batch-qa', 'run-language-repair', 'run-topic-repair', 'run-explanation-repair', 'run-all-gaps', 'run-targeted-gap-fill', 'normalize-topics', 'normalize-subjects', 'repair-options', 'rebuild-syllabus', 'rebuild-hsst-syllabus', 'upload-questions', 'save-topic-mapping', 'delete-topic-mapping', 'migrate-mappings'].includes(action)) {
                 await refreshData(true);
             }
         } catch(e:any) { setStatus(e.message); setIsError(true); }
@@ -313,6 +321,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     { id: 'qbank', label: 'Database Audit', icon: ShieldCheckIcon },
                     { id: 'exams', label: 'Exams', icon: AcademicCapIcon },
                     { id: 'syllabus', label: 'Syllabus', icon: PlusIcon },
+                    { id: 'mappings', label: 'Mappings', icon: TagIcon },
                     { id: 'books', label: 'Books', icon: BookOpenIcon },
                     { id: 'users', label: 'Users', icon: UserGroupIcon },
                     { id: 'settings', label: 'Settings', icon: Cog6ToothIcon }
@@ -617,6 +626,120 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                         <p className="text-slate-500 font-bold">Select an exam above to manage its syllabus items.</p>
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {activeTab === 'mappings' && (
+                            <div className="space-y-8 animate-fade-in">
+                                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-xl">
+                                    <div className="flex items-center space-x-3 mb-6">
+                                        <CloudArrowUpIcon className="h-6 w-6 text-indigo-600" />
+                                        <h4 className="text-sm font-black uppercase tracking-tight text-slate-700 dark:text-slate-300">Bulk Upload Mappings (CSV)</h4>
+                                    </div>
+                                    <p className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest leading-relaxed">
+                                        Format: "id","subject","topic","micro_topic"
+                                    </p>
+                                    <textarea 
+                                        value={csvText}
+                                        onChange={(e) => setCsvText(e.target.value)}
+                                        placeholder='Example: "1","History","Kerala History","Pazhassi Raja"'
+                                        className="w-full h-48 p-6 rounded-3xl border-2 border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-mono text-xs mb-6 focus:border-indigo-500 outline-none transition-all"
+                                    />
+                                    <div className="flex justify-end">
+                                        <button 
+                                            onClick={() => handleAction('upload-mappings')}
+                                            className="bg-indigo-600 text-white font-black px-10 py-4 rounded-2xl shadow-lg hover:bg-indigo-700 transition-all text-[10px] uppercase tracking-widest"
+                                        >
+                                            Upload Mappings
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                    <div>
+                                        <h3 className="text-2xl font-black uppercase tracking-tight">Topic Mapping Manager</h3>
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Map micro-topics to canonical subjects and topics</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={() => handleAction('migrate-mappings')}
+                                            className="bg-indigo-50 text-indigo-600 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-100 transition-all border border-indigo-200"
+                                        >
+                                            Migrate JSON Mappings
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                const newMapping = { subject: 'General Knowledge', topic: '', micro_topic: '' };
+                                                handleAction('save-topic-mapping', { rowData: newMapping });
+                                            }}
+                                            className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg flex items-center gap-2"
+                                        >
+                                            <PlusIcon className="h-3 w-3" /> Add Mapping
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 dark:bg-slate-900 rounded-[2.5rem] overflow-hidden border dark:border-slate-800 shadow-xl">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase text-slate-500">
+                                            <tr>
+                                                <th className="px-8 py-5">Subject</th>
+                                                <th className="px-8 py-5">Canonical Topic</th>
+                                                <th className="px-8 py-5">Micro-Topic (Tag)</th>
+                                                <th className="px-8 py-5 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                            {topicMappings.map(mapping => (
+                                                <tr key={mapping.id} className="text-sm font-bold">
+                                                    <td className="px-8 py-4">
+                                                        <select 
+                                                            defaultValue={mapping.subject}
+                                                            onBlur={async (e) => {
+                                                                if (e.target.value !== mapping.subject) {
+                                                                    await handleAction('save-topic-mapping', { rowData: { ...mapping, subject: e.target.value } });
+                                                                }
+                                                            }}
+                                                            className="bg-white dark:bg-slate-800 p-2 rounded-lg border-none text-[10px] font-bold shadow-inner outline-none w-full"
+                                                        >
+                                                            {auditReport?.approvedSubjects.map(s => <option key={s} value={s}>{s}</option>)}
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-8 py-4">
+                                                        <input 
+                                                            type="text" 
+                                                            defaultValue={mapping.topic} 
+                                                            onBlur={async (e) => {
+                                                                if (e.target.value !== mapping.topic) {
+                                                                    await handleAction('save-topic-mapping', { rowData: { ...mapping, topic: e.target.value } });
+                                                                }
+                                                            }}
+                                                            placeholder="Canonical Topic..."
+                                                            className="w-full bg-white dark:bg-slate-800 p-2 rounded-lg border-none text-[10px] font-bold shadow-inner outline-none"
+                                                        />
+                                                    </td>
+                                                    <td className="px-8 py-4">
+                                                        <input 
+                                                            type="text" 
+                                                            defaultValue={mapping.micro_topic} 
+                                                            onBlur={async (e) => {
+                                                                if (e.target.value !== mapping.micro_topic) {
+                                                                    await handleAction('save-topic-mapping', { rowData: { ...mapping, micro_topic: e.target.value } });
+                                                                }
+                                                            }}
+                                                            placeholder="Micro-Topic tag..."
+                                                            className="w-full bg-white dark:bg-slate-800 p-2 rounded-lg border-none text-[10px] font-bold shadow-inner outline-none"
+                                                        />
+                                                    </td>
+                                                    <td className="px-8 py-4 text-right">
+                                                        <button onClick={() => handleAction('delete-topic-mapping', { id: mapping.id })} className="p-2 text-red-500 hover:bg-red-50 rounded-lg">
+                                                            <TrashIcon className="h-4 w-4" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         )}
 

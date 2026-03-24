@@ -10,6 +10,13 @@ export type ExamLevel = 'Preliminary' | 'Main' | 'Departmental' | 'Special' | 'I
 export type Difficulty = 'Easy' | 'Moderate' | 'PSC Level';
 export type ExamCategory = '10th Level' | 'Plus Two Level' | 'Degree Level' | 'Medical' | 'Engineering' | 'Uniformed Services' | 'Administrative' | 'Higher Secondary' | 'Technical' | 'General' | 'Special';
 
+export interface TopicMapping {
+    id: number;
+    subject: string;
+    topic: string;
+    micro_topic: string;
+}
+
 export interface Exam {
   id: string;
   title: BilingualText;

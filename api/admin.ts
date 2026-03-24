@@ -149,6 +149,7 @@ export default async function handler(req: any, res: any) {
             case 'run-explanation-repair': return res.status(200).json(await backfillExplanations());
             case 'normalize-topics': return res.status(200).json(await normalizeTopics());
             case 'upload-questions': return res.status(200).json(await bulkUploadQuestions(questions));
+            case 'upload-mappings': return res.status(200).json(await bulkUploadMappings(questions));
             
             case 'save-row': {
                 const tableName = sheet.toLowerCase();
@@ -166,6 +167,8 @@ export default async function handler(req: any, res: any) {
                     sheetValues = [rowData.id, rowData.title, rowData.author, rowData.imageUrl, rowData.amazonLink];
                 } else if (tableName === 'syllabus') {
                     sheetValues = [rowData.id, rowData.exam_id, rowData.topic, rowData.subject, rowData.questions, rowData.duration, rowData.micro_topics];
+                } else if (tableName === 'topic_mappings') {
+                    sheetValues = [rowData.id, rowData.subject, rowData.topic, rowData.micro_topic];
                 }
                 await findAndUpsertRow(sheet, rowData.id, sheetValues);
                 return res.status(200).json({ message: `${sheet} entry updated.` });
@@ -423,6 +426,46 @@ export default async function handler(req: any, res: any) {
                 return res.status(200).json({ message: "All syllabus entries are already synced with global mappings." });
             }
 
+            case 'get-topic-mappings': {
+                if (!supabase) throw new Error("Supabase required.");
+                const { data } = await supabase.from('topic_mappings').select('*').order('subject', { ascending: true });
+                return res.status(200).json(data || []);
+            }
+            case 'save-topic-mapping': {
+                if (!supabase) throw new Error("Supabase required.");
+                await upsertSupabaseData('topic_mappings', [rowData], 'id');
+                await findAndUpsertRow('TopicMappings', rowData.id, [rowData.id, rowData.subject, rowData.topic, rowData.micro_topic]);
+                return res.status(200).json({ message: "Mapping saved." });
+            }
+            case 'delete-topic-mapping': {
+                if (!supabase) throw new Error("Supabase required.");
+                await deleteSupabaseRow('topic_mappings', id);
+                await deleteRowById('TopicMappings', id);
+                return res.status(200).json({ message: "Mapping deleted." });
+            }
+            case 'migrate-mappings': {
+                if (!supabase) throw new Error("Supabase required.");
+                const { data: settings } = await supabase.from('settings').select('value').eq('key', 'topic_mappings').single();
+                const mappings: Record<string, string[]> = settings?.value ? JSON.parse(settings.value) : {};
+                
+                const updates: any[] = [];
+                Object.entries(mappings).forEach(([topic, micros]) => {
+                    (micros || []).forEach(micro => {
+                        updates.push({
+                            subject: 'General Knowledge', // Default
+                            topic: topic,
+                            micro_topic: micro
+                        });
+                    });
+                });
+                
+                if (updates.length > 0) {
+                    await upsertSupabaseData('topic_mappings', updates);
+                    return res.status(200).json({ message: `Migrated ${updates.length} mappings. Please review subjects in the Mappings tab.` });
+                }
+                return res.status(200).json({ message: "No mappings to migrate." });
+            }
+
             case 'get-audit-report': {
                 if (!supabase) throw new Error("Supabase required.");
                 
@@ -431,24 +474,16 @@ export default async function handler(req: any, res: any) {
                     .from('questionbank')
                     .select('*', { count: 'exact', head: true });
 
-                // 2. Fetch data for classification audit (using pagination to get all rows)
+                // 2. Fetch data for classification audit
                 const qData = await fetchAllSupabaseData('questionbank', 'id, topic, subject');
                 const { data: sData } = await supabase.from('syllabus').select('id, topic, title, subject, micro_topics');
+                const { data: mData } = await supabase.from('topic_mappings').select('*');
                 
                 const totalQuestions = realTotalCount || qData?.length || 0;
                 
-                // 3. Fetch last audited ID and topic mappings
+                // 3. Fetch last audited ID
                 const { data: lastAuditedSetting } = await supabase.from('settings').select('value').eq('key', 'last_audited_id').maybeSingle();
                 const lastAuditedId = parseInt(lastAuditedSetting?.value || '0');
-
-                const { data: mappingSetting } = await supabase.from('settings').select('value').eq('key', 'topic_mappings').maybeSingle();
-                let topicMappings: Record<string, string[]> = {};
-                if (mappingSetting && mappingSetting.value) {
-                    try { topicMappings = JSON.parse(mappingSetting.value); } catch (e) {}
-                }
-                // Flatten mappings to a set of all mapped micro-topics
-                const mappedMicroTopics = new Set<string>();
-                Object.values(topicMappings).forEach(list => list.forEach(t => mappedMicroTopics.add(t.toLowerCase().trim())));
 
                 // 4. Prepare syllabus mapping for matching
                 const syllabusMappings = (sData || []).map(s => {
@@ -477,27 +512,27 @@ export default async function handler(req: any, res: any) {
                     const t = String(q.topic || '').trim();
                     const tLower = t.toLowerCase();
                     
-                    let effectiveTopicLower = tLower;
+                    // A question is valid if:
+                    // 1. Its (subject, topic) pair exists in the syllabus
+                    // 2. OR its topic is a mapped micro-topic for a (subject, topic) in syllabus
+                    // 3. OR its topic is a manual micro-topic in the syllabus table
                     
-                    // Check if the topic is a mapped micro-topic
-                    if (mappedMicroTopics.has(tLower)) {
-                        for (const [sTopic, mTopics] of Object.entries(topicMappings)) {
-                            if (mTopics.map(mt => mt.toLowerCase().trim()).includes(tLower)) {
-                                effectiveTopicLower = sTopic.toLowerCase().trim();
-                                break;
-                            }
-                        }
-                    }
+                    const isComboValidInSyllabus = syllabusComposites.has(`${sLower}|${tLower}`);
+                    
+                    const isMappedInTable = (mData || []).some(m => 
+                        m.subject.toLowerCase().trim() === sLower && 
+                        m.micro_topic.toLowerCase().trim() === tLower
+                    );
+                    
+                    const isManualMapped = (sData || []).some(s => 
+                        s.subject.toLowerCase().trim() === sLower && 
+                        String(s.micro_topics || '').toLowerCase().split(',').map(mt => mt.trim()).includes(tLower)
+                    );
 
-                    const composite = `${sLower}|${effectiveTopicLower}`;
-
-                    const isTopicInSyllabus = syllabusTopicsLower.includes(effectiveTopicLower);
-                    const isComboValid = syllabusComposites.has(composite);
+                    const isTopicInSyllabus = syllabusTopicsLower.includes(tLower) || isMappedInTable || isManualMapped;
                     const isSubjectApproved = approvedLower.includes(sLower);
-
-                    // A question is "Classified" ONLY if its Subject+Topic combo exists in the syllabus
-                    // AND the subject is in the approved list.
-                    const isInvalid = !isComboValid || !isSubjectApproved;
+                    
+                    const isInvalid = (!isComboValidInSyllabus && !isMappedInTable && !isManualMapped) || !isSubjectApproved;
 
                     if (isInvalid) {
                         unclassifiedCount++;
@@ -508,18 +543,15 @@ export default async function handler(req: any, res: any) {
                             if (!subjectMismatches.includes(s)) subjectMismatches.push(s);
                         }
 
-                        // If topic is not in syllabus at all, it's unapproved
+                        // If topic is not in syllabus at all AND not mapped, it's unapproved
                         if (tLower !== '' && tLower !== 'null' && !isTopicInSyllabus) {
                             if (!unapprovedTopics.includes(t)) unapprovedTopics.push(t);
                         }
 
                         // Populate TODO lists
-                        // 1. If topic exists but is not in syllabus -> Normalization (needs mapping)
                         if (tLower !== '' && tLower !== 'null' && !isTopicInSyllabus) {
                             normalizationTodoIds.push(q.id);
-                        } 
-                        // 2. If topic is missing OR is valid but subject is wrong -> Repair
-                        else {
+                        } else {
                             repairTodoIds.push(q.id);
                         }
                     } else {
@@ -558,12 +590,16 @@ export default async function handler(req: any, res: any) {
                     }
                     
                     const matchedTopics = new Set<string>();
-                    const matchingKey = Object.keys(topicMappings).find(k => k.toLowerCase() === sTopic);
-                    const mappedMicroTopicsForThisSyllabusTopic = matchingKey ? (topicMappings[matchingKey] || []).map(t => t.toLowerCase().trim()) : [];
+                    
+                    // Get mappings from the new table
+                    const mappingsForThisSyllabusTopic = (mData || []).filter(m => 
+                        m.subject.toLowerCase().trim() === sSubject && 
+                        m.topic.toLowerCase().trim() === sTopic
+                    ).map(m => m.micro_topic.toLowerCase().trim());
                     
                     // Also include manual micro-topics from the syllabus table
                     const manualMicroTopics = String(s.micro_topics || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
-                    const allMappedMicroTopics = Array.from(new Set([...mappedMicroTopicsForThisSyllabusTopic, ...manualMicroTopics]));
+                    const allMappedMicroTopics = Array.from(new Set([...mappingsForThisSyllabusTopic, ...manualMicroTopics]));
 
                     const matchedQs = qData?.filter(q => {
                         const qTopic = String(q.topic || '').toLowerCase().trim();
@@ -596,8 +632,7 @@ export default async function handler(req: any, res: any) {
                     subjectMismatches,
                     unapprovedTopics,
                     lastAuditedId,
-                    approvedSubjects: APPROVED_SUBJECTS,
-                    topicMappings
+                    approvedSubjects: APPROVED_SUBJECTS
                 });
             }
             case 'delete-row': await deleteRowById(sheet, id); if (supabase) await deleteSupabaseRow(sheet, id); return res.status(200).json({ message: 'Item deleted.' });
