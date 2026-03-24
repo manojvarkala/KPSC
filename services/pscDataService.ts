@@ -100,9 +100,20 @@ export const getSettings = async () => {
         if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data)) {
-                // Reduce array of {key, value} into a single object
+                // Reduce array of {key, value} OR [key, value] into a single object
                 return data.reduce((acc: any, curr: any) => {
-                    acc[curr.key] = curr.value;
+                    let key, value;
+                    if (Array.isArray(curr)) {
+                        key = curr[0];
+                        value = curr[1];
+                    } else if (curr && typeof curr === 'object') {
+                        key = curr.key;
+                        value = curr.value;
+                    }
+                    
+                    if (key) {
+                        acc[String(key).trim().toLowerCase().replace(/\s+/g, '_')] = String(value || '').trim();
+                    }
                     return acc;
                 }, {});
             }

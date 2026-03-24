@@ -599,7 +599,8 @@ export async function generateSyllabusForExam(exam: { id: string, title_en: stri
         title: t.topic,
         subject: t.subject,
         questions: t.questions,
-        duration: t.duration
+        duration: t.duration,
+        micro_topics: ''
     }));
 
     // Delete existing syllabus for this exam to avoid duplicates

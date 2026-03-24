@@ -153,7 +153,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         try {
             const r = await adminOp(action, payload);
             setStatus(r.message || "Action completed successfully.");
-            if (['delete-row', 'rebuild-db', 'sync-to-sheets', 'run-daily-sync', 'run-book-scraper', 'update-setting', 'save-row', 'run-batch-qa', 'run-language-repair', 'run-topic-repair', 'run-explanation-repair', 'run-all-gaps', 'run-targeted-gap-fill', 'normalize-topics', 'normalize-subjects', 'repair-options', 'rebuild-syllabus', 'rebuild-hsst-syllabus', 'upload-questions'].includes(action)) {
+            if (['delete-row', 'rebuild-db', 'sync-to-sheets', 'run-daily-sync', 'run-book-scraper', 'save-row', 'run-batch-qa', 'run-language-repair', 'run-topic-repair', 'run-explanation-repair', 'run-all-gaps', 'run-targeted-gap-fill', 'normalize-topics', 'normalize-subjects', 'repair-options', 'rebuild-syllabus', 'rebuild-hsst-syllabus', 'upload-questions'].includes(action)) {
                 await refreshData(true);
             }
         } catch(e:any) { setStatus(e.message); setIsError(true); }
@@ -558,7 +558,10 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         {activeTab === 'syllabus' && (
                             <div className="space-y-8 animate-fade-in">
                                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                                    <h3 className="text-2xl font-black uppercase tracking-tight">Micro-Topic Manager</h3>
+                                    <div>
+                                        <h3 className="text-2xl font-black uppercase tracking-tight">Micro-Topic Manager</h3>
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Manual mappings are additive to global settings</p>
+                                    </div>
                                     <select 
                                         value={selectedExamId}
                                         onChange={(e) => setSelectedExamId(e.target.value)}
@@ -573,13 +576,31 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     <div className="bg-slate-50 dark:bg-slate-900 rounded-[2.5rem] overflow-hidden border dark:border-slate-800 shadow-xl">
                                         <table className="w-full text-left">
                                             <thead className="bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase text-slate-500">
-                                                <tr><th className="px-8 py-5">Topic Name</th><th className="px-8 py-5">Subject</th><th className="px-8 py-5 text-right">Actions</th></tr>
+                                                <tr>
+                                                    <th className="px-8 py-5">Topic Name</th>
+                                                    <th className="px-8 py-5">Subject</th>
+                                                    <th className="px-8 py-5">Micro-Topics (Manual Mapping)</th>
+                                                    <th className="px-8 py-5 text-right">Actions</th>
+                                                </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                                                 {syllabusItems.map(item => (
                                                     <tr key={item.id} className="text-sm font-bold">
                                                         <td className="px-8 py-6">{item.topic}</td>
                                                         <td className="px-8 py-6"><span className="text-[10px] text-slate-400">{item.subject}</span></td>
+                                                        <td className="px-8 py-6">
+                                                            <input 
+                                                                type="text" 
+                                                                defaultValue={item.micro_topics || ''} 
+                                                                onBlur={async (e) => {
+                                                                    if (e.target.value !== (item.micro_topics || '')) {
+                                                                        await handleAction('save-row', { sheet: 'Syllabus', rowData: { ...item, micro_topics: e.target.value } });
+                                                                    }
+                                                                }}
+                                                                placeholder="Comma separated micro-topics..."
+                                                                className="w-full bg-white dark:bg-slate-800 p-3 rounded-xl border-none text-[10px] font-bold shadow-inner outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                                                            />
+                                                        </td>
                                                         <td className="px-8 py-6 text-right">
                                                             <button onClick={() => handleAction('delete-row', { sheet: 'Syllabus', id: item.id })} className="p-2 text-red-500 hover:bg-red-50 rounded-lg">
                                                                 <TrashIcon className="h-4 w-4" />
@@ -666,16 +687,46 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                         </div>
                                     </div>
 
-                                    {Object.entries(settings).filter(([k]) => !['free_pro_mode', 'auto_update_news', 'auto_update_ca', 'auto_update_gk', 'auto_update_ai_gaps', 'auto_update_flashcards'].includes(k)).map(([key, value]) => (
+                                    <div className="bg-amber-50 dark:bg-amber-900/20 p-8 rounded-[2.5rem] border border-amber-100 dark:border-amber-800 flex flex-col gap-4 shadow-xl shadow-amber-500/5">
+                                        <div className="flex items-center justify-between gap-6">
+                                            <div>
+                                                <h4 className="text-lg font-black uppercase tracking-tight text-amber-900 dark:text-amber-100">Sync Global Mappings</h4>
+                                                <p className="text-xs font-bold text-amber-600/70 mt-1">Populates the new "Micro-Topics" column in the Syllabus table using your existing global mappings.</p>
+                                            </div>
+                                            <button 
+                                                onClick={() => handleAction('sync-global-mappings')}
+                                                className="bg-amber-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center space-x-2 shadow-lg hover:bg-amber-700 transition-all"
+                                            >
+                                                <ArrowPathIcon className="h-4 w-4" /><span>Sync Now</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {Object.entries(settings).filter(([k]) => !['free_pro_mode', 'subscription_model_active', 'auto_update_news', 'auto_update_ca', 'auto_update_gk', 'auto_update_ai_gaps', 'auto_update_flashcards', 'paypal_client_id', 'last_audited_id', 'normalization_todo_ids', 'repair_todo_ids'].includes(k)).map(([key, value]) => (
                                         <div key={key} className="bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 flex flex-col gap-2">
                                             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">{key.replace(/_/g, ' ')}</label>
                                             <div className="flex items-center space-x-3">
-                                                <input 
-                                                    type="text" 
-                                                    defaultValue={String(value)}
-                                                    onBlur={async (e) => await updateSetting(key, e.target.value)}
-                                                    className="flex-1 bg-white dark:bg-slate-800 p-3 rounded-xl border-none font-bold text-sm shadow-inner" 
-                                                />
+                                                {key === 'topic_mappings' ? (
+                                                    <textarea 
+                                                        defaultValue={typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
+                                                        onBlur={async (e) => {
+                                                            try {
+                                                                JSON.parse(e.target.value);
+                                                                await updateSetting(key, e.target.value);
+                                                            } catch (err) {
+                                                                alert("Invalid JSON format for topic mappings.");
+                                                            }
+                                                        }}
+                                                        className="flex-1 bg-white dark:bg-slate-800 p-4 rounded-xl border-none font-mono text-xs shadow-inner min-h-[200px]" 
+                                                    />
+                                                ) : (
+                                                    <input 
+                                                        type="text" 
+                                                        defaultValue={String(value)}
+                                                        onBlur={async (e) => await updateSetting(key, e.target.value)}
+                                                        className="flex-1 bg-white dark:bg-slate-800 p-3 rounded-xl border-none font-bold text-sm shadow-inner" 
+                                                    />
+                                                )}
                                                 <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><CheckCircleIcon className="h-4 w-4" /></div>
                                             </div>
                                         </div>

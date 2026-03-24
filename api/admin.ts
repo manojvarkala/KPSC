@@ -164,6 +164,8 @@ export default async function handler(req: any, res: any) {
                     sheetValues = [rowData.id, rowData.title_ml, rowData.title_en, rowData.description_ml, rowData.description_en, rowData.category, rowData.level, rowData.icon_type];
                 } else if (tableName === 'bookstore') {
                     sheetValues = [rowData.id, rowData.title, rowData.author, rowData.imageUrl, rowData.amazonLink];
+                } else if (tableName === 'syllabus') {
+                    sheetValues = [rowData.id, rowData.exam_id, rowData.topic, rowData.subject, rowData.questions, rowData.duration, rowData.micro_topics];
                 }
                 await findAndUpsertRow(sheet, rowData.id, sheetValues);
                 return res.status(200).json({ message: `${sheet} entry updated.` });
@@ -387,6 +389,40 @@ export default async function handler(req: any, res: any) {
                 return res.status(200).json({ message: `Setting updated.` });
             }
 
+            case 'sync-global-mappings': {
+                if (!supabase) throw new Error("Supabase required.");
+                const { data: sData } = await supabase.from('syllabus').select('*');
+                const { data: settings } = await supabase.from('settings').select('value').eq('key', 'topic_mappings').single();
+                const mappings: Record<string, string[]> = settings?.value ? JSON.parse(settings.value) : {};
+                
+                const updates = (sData || []).map(s => {
+                    const topic = s.topic || s.title;
+                    if (!topic) return null;
+                    
+                    const matchingKey = Object.keys(mappings).find(k => k.toLowerCase() === topic.toLowerCase());
+                    const mapped = matchingKey ? (mappings[matchingKey] || []) : [];
+                    
+                    if (mapped.length > 0) {
+                        const existing = String(s.micro_topics || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+                        const combined = Array.from(new Set([...existing, ...mapped.map(t => t.toLowerCase().trim())]));
+                        const newValue = combined.join(', ');
+                        if (newValue !== (s.micro_topics || '')) {
+                            return { id: s.id, micro_topics: newValue };
+                        }
+                    }
+                    return null;
+                }).filter(Boolean) as any[];
+                
+                if (updates.length > 0) {
+                    for (let i = 0; i < updates.length; i += 50) {
+                        await upsertSupabaseData('syllabus', updates.slice(i, i + 50), 'id');
+                    }
+                    await syncSupabaseToSheets();
+                    return res.status(200).json({ message: `Synced mappings for ${updates.length} syllabus entries.` });
+                }
+                return res.status(200).json({ message: "All syllabus entries are already synced with global mappings." });
+            }
+
             case 'get-audit-report': {
                 if (!supabase) throw new Error("Supabase required.");
                 
@@ -397,7 +433,7 @@ export default async function handler(req: any, res: any) {
 
                 // 2. Fetch data for classification audit (using pagination to get all rows)
                 const qData = await fetchAllSupabaseData('questionbank', 'id, topic, subject');
-                const { data: sData } = await supabase.from('syllabus').select('id, topic, title, subject');
+                const { data: sData } = await supabase.from('syllabus').select('id, topic, title, subject, micro_topics');
                 
                 const totalQuestions = realTotalCount || qData?.length || 0;
                 
@@ -524,12 +560,17 @@ export default async function handler(req: any, res: any) {
                     const matchedTopics = new Set<string>();
                     const matchingKey = Object.keys(topicMappings).find(k => k.toLowerCase() === sTopic);
                     const mappedMicroTopicsForThisSyllabusTopic = matchingKey ? (topicMappings[matchingKey] || []).map(t => t.toLowerCase().trim()) : [];
+                    
+                    // Also include manual micro-topics from the syllabus table
+                    const manualMicroTopics = String(s.micro_topics || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+                    const allMappedMicroTopics = Array.from(new Set([...mappedMicroTopicsForThisSyllabusTopic, ...manualMicroTopics]));
+
                     const matchedQs = qData?.filter(q => {
                         const qTopic = String(q.topic || '').toLowerCase().trim();
                         const qSubject = String(q.subject || '').toLowerCase().trim();
                         
                         // Must match BOTH subject and topic exactly, OR topic is a mapped micro-topic
-                        const isTopicMatch = qTopic === sTopic || mappedMicroTopicsForThisSyllabusTopic.includes(qTopic);
+                        const isTopicMatch = qTopic === sTopic || allMappedMicroTopics.includes(qTopic);
                         const isMatch = isTopicMatch && qSubject === sSubject;
                         if (isMatch && qTopic) matchedTopics.add(q.topic);
                         return isMatch;
