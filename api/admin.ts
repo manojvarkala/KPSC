@@ -481,7 +481,7 @@ export default async function handler(req: any, res: any) {
 
                 // 2. Fetch data for classification audit
                 const qData = await fetchAllSupabaseData('questionbank', 'id, topic, subject');
-                const { data: sData } = await supabase.from('syllabus').select('id, topic, title, subject, micro_topics');
+                const { data: sData } = await supabase.from('syllabus').select('id, topic, title, subject');
                 const { data: mData } = await supabase.from('topic_mappings').select('*');
                 
                 const totalQuestions = realTotalCount || qData?.length || 0;
@@ -529,10 +529,7 @@ export default async function handler(req: any, res: any) {
                         m.micro_topic.toLowerCase().trim() === tLower
                     );
                     
-                    const isManualMapped = (sData || []).some(s => 
-                        s.subject.toLowerCase().trim() === sLower && 
-                        String(s.micro_topics || '').toLowerCase().split(',').map(mt => mt.trim()).includes(tLower)
-                    );
+                    const isManualMapped = false; // micro_topics column removed from syllabus
 
                     const isTopicInSyllabus = syllabusTopicsLower.includes(tLower) || isMappedInTable || isManualMapped;
                     const isSubjectApproved = approvedLower.includes(sLower);
@@ -602,9 +599,8 @@ export default async function handler(req: any, res: any) {
                         m.topic.toLowerCase().trim() === sTopic
                     ).map(m => m.micro_topic.toLowerCase().trim());
                     
-                    // Also include manual micro-topics from the syllabus table
-                    const manualMicroTopics = String(s.micro_topics || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
-                    const allMappedMicroTopics = Array.from(new Set([...mappingsForThisSyllabusTopic, ...manualMicroTopics]));
+                    // Mappings now come exclusively from the topic_mappings table
+                    const allMappedMicroTopics = Array.from(new Set([...mappingsForThisSyllabusTopic]));
 
                     const matchedQs = qData?.filter(q => {
                         const qTopic = String(q.topic || '').toLowerCase().trim();

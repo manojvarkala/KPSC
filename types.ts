@@ -149,7 +149,6 @@ export interface PracticeTest {
   subject: string;
   topic: string;
   examId?: string;
-  micro_topics?: string;
 }
 
 export interface ExamPageContent {

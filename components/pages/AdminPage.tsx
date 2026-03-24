@@ -602,7 +602,6 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                 <tr>
                                                     <th className="px-8 py-5">Topic Name</th>
                                                     <th className="px-8 py-5">Subject</th>
-                                                    <th className="px-8 py-5">Micro-Topics (Manual Mapping)</th>
                                                     <th className="px-8 py-5 text-right">Actions</th>
                                                 </tr>
                                             </thead>
@@ -611,19 +610,6 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                     <tr key={item.id} className="text-sm font-bold">
                                                         <td className="px-8 py-6">{item.topic}</td>
                                                         <td className="px-8 py-6"><span className="text-[10px] text-slate-400">{item.subject}</span></td>
-                                                        <td className="px-8 py-6">
-                                                            <input 
-                                                                type="text" 
-                                                                defaultValue={item.micro_topics || ''} 
-                                                                onBlur={async (e) => {
-                                                                    if (e.target.value !== (item.micro_topics || '')) {
-                                                                        await handleAction('save-row', { sheet: 'Syllabus', rowData: { ...item, micro_topics: e.target.value } });
-                                                                    }
-                                                                }}
-                                                                placeholder="Comma separated micro-topics..."
-                                                                className="w-full bg-white dark:bg-slate-800 p-3 rounded-xl border-none text-[10px] font-bold shadow-inner outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
-                                                            />
-                                                        </td>
                                                         <td className="px-8 py-6 text-right">
                                                             <button onClick={() => handleAction('delete-row', { sheet: 'Syllabus', id: item.id })} className="p-2 text-red-500 hover:bg-red-50 rounded-lg">
                                                                 <TrashIcon className="h-4 w-4" />
@@ -852,7 +838,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                         <div className="flex items-center justify-between gap-6">
                                             <div>
                                                 <h4 className="text-lg font-black uppercase tracking-tight text-amber-900 dark:text-amber-100">Sync Global Mappings</h4>
-                                                <p className="text-xs font-bold text-amber-600/70 mt-1">Populates the new "Micro-Topics" column in the Syllabus table using your existing global mappings.</p>
+                                                <p className="text-xs font-bold text-amber-600/70 mt-1">Updates the audit report using your existing global mappings.</p>
                                             </div>
                                             <button 
                                                 onClick={() => handleAction('sync-global-mappings')}
