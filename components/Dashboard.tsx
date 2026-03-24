@@ -48,7 +48,12 @@ const Dashboard: React.FC<{ onNavigateToExam: (exam: Exam) => void; onNavigate: 
   const groupedExams = useMemo(() => {
     const groups: Record<string, Exam[]> = {};
     allExams.forEach(exam => {
-        const cat = exam.category || 'General';
+        let cat = (exam.category || 'General').trim();
+        // Normalize common variations to ensure grouping works
+        if (cat.toLowerCase() === 'teachers') cat = 'Teachers';
+        if (cat.toLowerCase() === 'kpsc') cat = 'KPSC';
+        if (cat.toLowerCase() === 'general') cat = 'General';
+        
         if (!groups[cat]) groups[cat] = [];
         groups[cat].push(exam);
     });
@@ -56,10 +61,12 @@ const Dashboard: React.FC<{ onNavigateToExam: (exam: Exam) => void; onNavigate: 
   }, [allExams]);
 
   const sortedCategoryIds = useMemo(() => {
-    const priority = ['General', 'Teachers', 'Technical', 'Special', 'Live'];
+    const priority = ['KPSC', 'Teachers', 'Degree Level', '12th Level', '10th Level', 'General', 'Technical', 'Special', 'Live'];
     const existing = Object.keys(groupedExams);
-    const allIds = Array.from(new Set([...priority, ...existing]));
-    return allIds.filter(id => groupedExams[id] && groupedExams[id].length > 0);
+    // Combine priority and existing, keeping order of priority and adding others alphabetically
+    const otherCategories = existing.filter(cat => !priority.includes(cat)).sort();
+    const allIds = [...priority.filter(cat => existing.includes(cat)), ...otherCategories];
+    return allIds;
   }, [groupedExams]);
 
   const themes: ('indigo' | 'emerald' | 'rose' | 'amber' | 'cyan')[] = ['indigo', 'emerald', 'rose', 'amber', 'cyan'];

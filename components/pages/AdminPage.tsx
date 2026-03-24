@@ -160,7 +160,13 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         setIsError(false);
         try {
             const r = await adminOp(action, payload);
-            setStatus(r.message || "Action completed successfully.");
+            let msg = r.message || "Action completed successfully.";
+            if (r.report && Array.isArray(r.report)) {
+                msg += "\n\nReport:\n" + r.report.map((t: any) => 
+                    `- ${t.table}: ${t.status}${t.rows !== undefined ? ` (${t.rows} rows)` : ''}${t.reason ? ` - ${t.reason}` : ''}${t.error ? ` - Error: ${t.error}` : ''}${t.sample ? ` [Sample: ${JSON.stringify(t.sample)}]` : ''}`
+                ).join('\n');
+            }
+            setStatus(msg);
             if (['delete-row', 'rebuild-db', 'sync-exams', 'sync-syllabus', 'sync-mappings', 'sync-qbank', 'sync-to-sheets', 'run-daily-sync', 'run-book-scraper', 'save-row', 'run-batch-qa', 'run-language-repair', 'run-topic-repair', 'run-explanation-repair', 'run-all-gaps', 'run-targeted-gap-fill', 'normalize-topics', 'normalize-subjects', 'repair-options', 'rebuild-syllabus', 'rebuild-hsst-syllabus', 'upload-questions', 'upload-mappings', 'save-topic-mapping', 'delete-topic-mapping', 'migrate-mappings'].includes(action)) {
                 await refreshData(true);
             }

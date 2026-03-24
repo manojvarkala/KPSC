@@ -1198,7 +1198,7 @@ export async function syncAllFromSheetsToSupabase(targetTable?: string) {
             sheet: 'Exams', 
             supabase: 'exams', 
             map: (r: any[]) => ({ 
-                id: r[0], 
+                id: String(r[0] || '').trim(), 
                 title_ml: r[1], 
                 title_en: r[2], 
                 description_ml: r[3], 
@@ -1211,48 +1211,36 @@ export async function syncAllFromSheetsToSupabase(targetTable?: string) {
         { 
             sheet: 'Syllabus', 
             supabase: 'syllabus', 
-            map: (r: any[]) => {
-                // Handle 6 columns (no ID) or 7 columns (with ID)
-                const offset = r.length >= 7 ? 1 : 0;
-                return {
-                    exam_id: r[0 + offset],
-                    title: r[1 + offset],
-                    questions: parseInt(r[2 + offset] || '0'),
-                    duration: parseInt(r[3 + offset] || '0'),
-                    subject: r[4 + offset],
-                    topic: r[5 + offset]
-                };
-            }
+            map: (r: any[], offset: number) => ({
+                exam_id: String(r[0 + offset] || '').trim(),
+                title: r[1 + offset],
+                questions: parseInt(String(r[2 + offset] || '0')),
+                duration: parseInt(String(r[3 + offset] || '0')),
+                subject: r[4 + offset],
+                topic: r[5 + offset]
+            })
         },
         { 
             sheet: 'TopicMappings', 
             supabase: 'topic_mappings', 
-            map: (r: any[]) => {
-                // Handle 3 columns (no ID) or 4 columns (with ID)
-                const offset = r.length >= 4 ? 1 : 0;
-                return {
-                    subject: r[0 + offset],
-                    topic: r[1 + offset],
-                    micro_topic: r[2 + offset]
-                };
-            }
+            map: (r: any[], offset: number) => ({
+                subject: r[0 + offset],
+                topic: r[1 + offset],
+                micro_topic: r[2 + offset]
+            })
         },
         { 
             sheet: 'QuestionBank', 
             supabase: 'questionbank', 
-            map: (r: any[]) => {
-                // Handle 7 columns (no ID) or 8 columns (with ID)
-                const offset = r.length >= 8 ? 1 : 0;
-                return {
-                    topic: r[0 + offset] || 'General',
-                    question: r[1 + offset],
-                    options: smartParseOptions(r[2 + offset]),
-                    correct_answer_index: parseInt(r[3 + offset] || '1'),
-                    subject: r[4 + offset] || 'General Knowledge',
-                    difficulty: r[5 + offset] || 'PSC Level',
-                    explanation: r[6 + offset] || ''
-                };
-            }
+            map: (r: any[], offset: number) => ({
+                topic: r[0 + offset] || 'General',
+                question: r[1 + offset],
+                options: smartParseOptions(r[2 + offset]),
+                correct_answer_index: parseInt(String(r[3 + offset] || '1')),
+                subject: r[4 + offset] || 'General Knowledge',
+                difficulty: r[5 + offset] || 'PSC Level',
+                explanation: r[6 + offset] || ''
+            })
         }
     ];
 
@@ -1261,76 +1249,89 @@ export async function syncAllFromSheetsToSupabase(targetTable?: string) {
         throw new Error(`Table ${targetTable} not found in sync configuration.`);
     }
 
+    const report: any[] = [];
+
     for (const t of targetTables) {
         try {
             console.log(`Syncing ${t.sheet} -> ${t.supabase}...`);
             const rows = await readSheetData(`${t.sheet}!A2:Z`);
-            console.log(`Read ${rows?.length || 0} rows from ${t.sheet}`);
-            if (rows?.length) {
-                // Filter out rows where the first "data" column is empty or row is mostly empty
-                const mappedData = rows.filter(r => {
-                    // Row must have at least some non-empty content
-                    const hasContent = r.some(cell => cell && String(cell).trim() !== '');
-                    if (!hasContent) return false;
-                    
-                    // Specific validation for each table
-                    if (t.supabase === 'questionbank') {
-                        // QuestionBank must have a question (column 1 or 2 depending on offset)
-                        const offset = r.length >= 8 ? 1 : 0;
-                        return r[1 + offset] && String(r[1 + offset]).trim() !== '';
-                    }
-                    if (t.supabase === 'syllabus') {
-                        // Syllabus must have an exam_id and title
-                        const offset = r.length >= 7 ? 1 : 0;
-                        return r[0 + offset] && r[1 + offset];
-                    }
-                    return true;
-                }).map(t.map as any);
-                
-                console.log(`Mapped ${mappedData.length} valid rows for ${t.supabase}`);
-                
-                if (mappedData.length === 0) {
-                    console.warn(`No valid data found for ${t.supabase}. Skipping sync to avoid clearing table.`);
-                    continue;
+            
+            if (!rows || rows.length === 0) {
+                report.push({ table: t.supabase, status: 'skipped', reason: 'No data found in sheet' });
+                continue;
+            }
+
+            // Robust ID detection: Check if the first column of the first few rows looks like an ID (integer)
+            let offset = 0;
+            if (['syllabus', 'topic_mappings', 'questionbank'].includes(t.supabase)) {
+                const firstRow = rows[0];
+                const firstCell = String(firstRow[0] || '').trim();
+                const isNumeric = !isNaN(parseInt(firstCell)) && /^\d+$/.test(firstCell);
+                const baseLen = t.supabase === 'topic_mappings' ? 3 : (t.supabase === 'syllabus' ? 6 : 7);
+                if (isNumeric && firstRow.length > baseLen) {
+                    offset = 1;
                 }
+            }
 
+            const mappedData = rows.filter(r => {
+                const hasContent = r.some(cell => cell && String(cell).trim() !== '');
+                if (!hasContent) return false;
+                
+                if (t.supabase === 'questionbank') {
+                    return r[1 + offset] && String(r[1 + offset]).trim() !== '';
+                }
+                if (t.supabase === 'syllabus') {
+                    return r[0 + offset] && r[1 + offset];
+                }
                 if (t.supabase === 'exams') {
-                    // Exams use string IDs, upsert is fine
-                    await upsertSupabaseData(t.supabase, mappedData);
-                } else {
-                    // For tables with auto-id (int), delete and insert to avoid "non-DEFAULT value" error
-                    console.log(`Clearing table ${t.supabase}...`);
-                    const { error: delError } = await supabase.from(t.supabase).delete().neq('id', -1);
-                    if (delError) {
-                        if (delError.message.includes('not find the table')) {
-                            console.warn(`Table ${t.supabase} not found in Supabase. Skipping.`);
-                            continue;
-                        }
-                        console.error(`Delete failed for ${t.supabase}:`, delError.message);
-                        // If delete fails, we might still want to try insert if it was a partial failure, 
-                        // but usually it means something is wrong with the table.
-                    }
+                    return r[0] && r[1];
+                }
+                return true;
+            }).map(r => t.map(r, offset));
 
-                    // Batch insert to avoid payload limits
+            if (mappedData.length > 0) {
+                if (t.supabase === 'exams') {
+                    await upsertSupabaseData(t.supabase, mappedData);
+                    report.push({ table: t.supabase, status: 'success', rows: mappedData.length });
+                } else {
+                    const { error: delError } = await supabase.from(t.supabase).delete().neq('id', -1);
+                    if (delError) console.error(`Clear failed for ${t.supabase}:`, delError.message);
+
                     let inserted = 0;
-                    for (let i = 0; i < mappedData.length; i += 100) {
-                        const batch = mappedData.slice(i, i + 100);
+                    const batchSize = 100;
+                    for (let i = 0; i < mappedData.length; i += batchSize) {
+                        const batch = mappedData.slice(i, i + batchSize);
                         const { error: insError } = await supabase.from(t.supabase).insert(batch);
                         if (insError) {
-                            console.error(`Insert failed for ${t.supabase} batch ${i}:`, insError.message);
-                            // We don't break here, try next batch? 
-                            // Actually, if it's a schema error, all batches will fail.
-                            // But if it's a single bad row, only one batch fails.
+                            console.error(`Insert failed for ${t.supabase} batch:`, insError.message);
                         } else {
                             inserted += batch.length;
                         }
                     }
-                    console.log(`Successfully inserted ${inserted} rows into ${t.supabase}`);
+                    report.push({ 
+                        table: t.supabase, 
+                        status: 'success', 
+                        rows: inserted, 
+                        total: rows.length,
+                        sample: rows[0] ? rows[0].slice(0, 3) : []
+                    });
                 }
+            } else {
+                report.push({ 
+                    table: t.supabase, 
+                    status: 'skipped', 
+                    reason: 'No valid rows after filtering',
+                    sample: rows[0] ? rows[0].slice(0, 3) : []
+                });
             }
         } catch (e: any) {
-            console.error(`Sync failed for table ${t.supabase}:`, e.message);
+            console.error(`Sync failed for ${t.supabase}:`, e.message);
+            report.push({ table: t.supabase, status: 'error', error: e.message });
         }
     }
-    return { message: "Sync complete." };
+
+    return { 
+        message: targetTable ? `Sync for ${targetTable} complete.` : "Full database sync complete.",
+        report 
+    };
 }
