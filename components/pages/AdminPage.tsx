@@ -161,7 +161,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         try {
             const r = await adminOp(action, payload);
             setStatus(r.message || "Action completed successfully.");
-            if (['delete-row', 'rebuild-db', 'sync-to-sheets', 'run-daily-sync', 'run-book-scraper', 'save-row', 'run-batch-qa', 'run-language-repair', 'run-topic-repair', 'run-explanation-repair', 'run-all-gaps', 'run-targeted-gap-fill', 'normalize-topics', 'normalize-subjects', 'repair-options', 'rebuild-syllabus', 'rebuild-hsst-syllabus', 'upload-questions', 'upload-mappings', 'save-topic-mapping', 'delete-topic-mapping', 'migrate-mappings'].includes(action)) {
+            if (['delete-row', 'rebuild-db', 'sync-exams', 'sync-syllabus', 'sync-mappings', 'sync-qbank', 'sync-to-sheets', 'run-daily-sync', 'run-book-scraper', 'save-row', 'run-batch-qa', 'run-language-repair', 'run-topic-repair', 'run-explanation-repair', 'run-all-gaps', 'run-targeted-gap-fill', 'normalize-topics', 'normalize-subjects', 'repair-options', 'rebuild-syllabus', 'rebuild-hsst-syllabus', 'upload-questions', 'upload-mappings', 'save-topic-mapping', 'delete-topic-mapping', 'migrate-mappings'].includes(action)) {
                 await refreshData(true);
             }
         } catch(e:any) { setStatus(e.message); setIsError(true); }
@@ -419,6 +419,10 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         {activeTab === 'automation' && (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 <ToolCard title="Full DB Sync" icon={ArrowPathIcon} action="rebuild-db" color="bg-red-600" desc="Synchronizes all records from Google Sheets to Supabase production database." />
+                                <ToolCard title="Sync Exams" icon={AcademicCapIcon} action="sync-exams" color="bg-slate-800" desc="Sync only the Exams table from Sheets." />
+                                <ToolCard title="Sync Syllabus" icon={PlusIcon} action="sync-syllabus" color="bg-amber-600" desc="Sync only the Syllabus table from Sheets." />
+                                <ToolCard title="Sync Mappings" icon={TagIcon} action="sync-mappings" color="bg-blue-600" desc="Sync only the Topic Mappings table from Sheets." />
+                                <ToolCard title="Sync Q-Bank" icon={ClipboardListIcon} action="sync-qbank" color="bg-rose-600" desc="Sync only the Question Bank table from Sheets." />
                                 <ToolCard title="Push to Sheets" icon={CloudArrowUpIcon} action="sync-to-sheets" color="bg-orange-600" desc="Backup Supabase data back to Google Sheets (Emergency Use)." />
                                 <ToolCard title="PSC Daily Sync" icon={SparklesIcon} action="run-daily-sync" color="bg-indigo-600" desc="Full cycle sync: Jobs, Live Updates, CA, GK and Gap Filler." />
                                 <ToolCard title="Language Repair" icon={LanguageIcon} action="run-language-repair" color="bg-cyan-600" desc="Fixes questions that were accidentally translated to Malayalam instead of English." />

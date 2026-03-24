@@ -1191,7 +1191,7 @@ async function processNormalizationBatch(toRepair: any[], approvedMappings: { to
     return { message: "Normalization batch failed." };
 }
 
-export async function syncAllFromSheetsToSupabase() {
+export async function syncAllFromSheetsToSupabase(targetTable?: string) {
     if (!supabase) throw new Error("No Supabase.");
     const tables = [
         { 
@@ -1255,30 +1255,60 @@ export async function syncAllFromSheetsToSupabase() {
             }
         }
     ];
-    for (const t of tables) {
+
+    const targetTables = targetTable ? tables.filter(t => t.supabase === targetTable) : tables;
+    if (targetTable && targetTables.length === 0) {
+        throw new Error(`Table ${targetTable} not found in sync configuration.`);
+    }
+
+    for (const t of targetTables) {
         try {
             console.log(`Syncing ${t.sheet} -> ${t.supabase}...`);
             const rows = await readSheetData(`${t.sheet}!A2:Z`);
             console.log(`Read ${rows?.length || 0} rows from ${t.sheet}`);
             if (rows?.length) {
-                // Filter out rows where the first "data" column is empty
+                // Filter out rows where the first "data" column is empty or row is mostly empty
                 const mappedData = rows.filter(r => {
-                    return r.some(cell => cell && String(cell).trim() !== '');
+                    // Row must have at least some non-empty content
+                    const hasContent = r.some(cell => cell && String(cell).trim() !== '');
+                    if (!hasContent) return false;
+                    
+                    // Specific validation for each table
+                    if (t.supabase === 'questionbank') {
+                        // QuestionBank must have a question (column 1 or 2 depending on offset)
+                        const offset = r.length >= 8 ? 1 : 0;
+                        return r[1 + offset] && String(r[1 + offset]).trim() !== '';
+                    }
+                    if (t.supabase === 'syllabus') {
+                        // Syllabus must have an exam_id and title
+                        const offset = r.length >= 7 ? 1 : 0;
+                        return r[0 + offset] && r[1 + offset];
+                    }
+                    return true;
                 }).map(t.map as any);
                 
                 console.log(`Mapped ${mappedData.length} valid rows for ${t.supabase}`);
                 
+                if (mappedData.length === 0) {
+                    console.warn(`No valid data found for ${t.supabase}. Skipping sync to avoid clearing table.`);
+                    continue;
+                }
+
                 if (t.supabase === 'exams') {
                     // Exams use string IDs, upsert is fine
                     await upsertSupabaseData(t.supabase, mappedData);
                 } else {
                     // For tables with auto-id (int), delete and insert to avoid "non-DEFAULT value" error
-                    // This is a workaround for GENERATED ALWAYS columns
                     console.log(`Clearing table ${t.supabase}...`);
                     const { error: delError } = await supabase.from(t.supabase).delete().neq('id', -1);
-                    if (delError && !delError.message.includes('not find the table')) {
+                    if (delError) {
+                        if (delError.message.includes('not find the table')) {
+                            console.warn(`Table ${t.supabase} not found in Supabase. Skipping.`);
+                            continue;
+                        }
                         console.error(`Delete failed for ${t.supabase}:`, delError.message);
-                        continue;
+                        // If delete fails, we might still want to try insert if it was a partial failure, 
+                        // but usually it means something is wrong with the table.
                     }
 
                     // Batch insert to avoid payload limits
@@ -1287,14 +1317,13 @@ export async function syncAllFromSheetsToSupabase() {
                         const batch = mappedData.slice(i, i + 100);
                         const { error: insError } = await supabase.from(t.supabase).insert(batch);
                         if (insError) {
-                            if (insError.message.includes('not find the table')) {
-                                console.warn(`Table ${t.supabase} not found in Supabase. Skipping insert.`);
-                                break;
-                            }
                             console.error(`Insert failed for ${t.supabase} batch ${i}:`, insError.message);
-                            break;
+                            // We don't break here, try next batch? 
+                            // Actually, if it's a schema error, all batches will fail.
+                            // But if it's a single bad row, only one batch fails.
+                        } else {
+                            inserted += batch.length;
                         }
-                        inserted += batch.length;
                     }
                     console.log(`Successfully inserted ${inserted} rows into ${t.supabase}`);
                 }

@@ -99,6 +99,7 @@ export const translations = {
     topCourses: "Top Courses",
     examCategories: {
       General: "General Exams",
+      Teachers: "Teachers Exams",
       Technical: "Technical Exams",
       Special: "Special Exams",
       Live: "New Notifications"

@@ -134,6 +134,10 @@ export default async function handler(req: any, res: any) {
     try {
         switch (action) {
             case 'rebuild-db': return res.status(200).json(await syncAllFromSheetsToSupabase());
+            case 'sync-exams': return res.status(200).json(await syncAllFromSheetsToSupabase('exams'));
+            case 'sync-syllabus': return res.status(200).json(await syncAllFromSheetsToSupabase('syllabus'));
+            case 'sync-mappings': return res.status(200).json(await syncAllFromSheetsToSupabase('topic_mappings'));
+            case 'sync-qbank': return res.status(200).json(await syncAllFromSheetsToSupabase('questionbank'));
             case 'sync-to-sheets': return res.status(200).json(await syncSupabaseToSheets());
             case 'run-daily-sync': return res.status(200).json(await runDailyUpdateScrapers());
             case 'run-gk-scraper': return res.status(200).json(await scrapeGkFacts());

@@ -102,6 +102,7 @@ export const translations = {
     topCourses: "പ്രധാന കോഴ്സുകൾ",
     examCategories: {
       General: "ജനറൽ പരീക്ഷകൾ",
+      Teachers: "അധ്യാപക പരീക്ഷകൾ",
       Technical: "സാങ്കേതിക പരീക്ഷകൾ",
       Special: "സ്പെഷ്യൽ പരീക്ഷകൾ",
       Live: "പുതിയ അറിയിപ്പുകൾ"

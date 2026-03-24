@@ -41,7 +41,14 @@ const ExamCard: React.FC<ExamCardProps> = ({ exam, onNavigate, language, theme =
               {exam.icon}
           </div>
           <div className="flex-1 min-w-0">
-              <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 mb-2 inline-block tracking-widest">{exam.level}</span>
+              <div className="flex flex-wrap gap-2 mb-2">
+                <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 tracking-widest">{exam.level}</span>
+                {exam.category && (
+                  <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded bg-gradient-to-r ${themeGradients[theme]} text-white tracking-widest opacity-90`}>
+                    {t(`dashboard.examCategories.${exam.category}`) || exam.category}
+                  </span>
+                )}
+              </div>
               <h4 className="text-xl font-black text-slate-800 dark:text-slate-100 leading-tight tracking-tight line-clamp-2">{exam.title[language]}</h4>
           </div>
         </div>

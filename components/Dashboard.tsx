@@ -56,7 +56,7 @@ const Dashboard: React.FC<{ onNavigateToExam: (exam: Exam) => void; onNavigate: 
   }, [allExams]);
 
   const sortedCategoryIds = useMemo(() => {
-    const priority = ['General', 'Technical', 'Special', 'Live'];
+    const priority = ['General', 'Teachers', 'Technical', 'Special', 'Live'];
     const existing = Object.keys(groupedExams);
     const allIds = Array.from(new Set([...priority, ...existing]));
     return allIds.filter(id => groupedExams[id] && groupedExams[id].length > 0);
