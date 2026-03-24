@@ -659,6 +659,30 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                         <h3 className="text-2xl font-black uppercase tracking-tight">Topic Mapping Manager</h3>
                                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Map micro-topics to canonical subjects and topics</p>
                                     </div>
+
+                                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border-2 border-slate-100 dark:border-slate-800 shadow-xl mt-8 w-full">
+                                        <div className="flex items-center space-x-3 mb-6">
+                                            <CloudArrowUpIcon className="h-6 w-6 text-indigo-600" />
+                                            <h4 className="text-sm font-black uppercase tracking-tight text-slate-700 dark:text-slate-300">Bulk Upload Mappings (CSV)</h4>
+                                        </div>
+                                        <p className="text-xs font-bold text-slate-500 mb-4 uppercase tracking-widest leading-relaxed">
+                                            Format: "id","subject","topic","micro_topic"
+                                        </p>
+                                        <textarea 
+                                            value={csvText}
+                                            onChange={(e) => setCsvText(e.target.value)}
+                                            placeholder='Example: "1","History","Kerala History","Pazhassi Raja"'
+                                            className="w-full h-48 p-6 rounded-3xl border-2 border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-mono text-xs mb-6 focus:border-indigo-500 outline-none transition-all"
+                                        />
+                                        <div className="flex justify-end">
+                                            <button 
+                                                onClick={() => handleAction('upload-mappings')}
+                                                className="bg-indigo-600 text-white font-black px-10 py-4 rounded-2xl shadow-lg hover:bg-indigo-700 transition-all text-[10px] uppercase tracking-widest"
+                                            >
+                                                Upload Mappings
+                                            </button>
+                                        </div>
+                                    </div>
                                     <div className="flex gap-2">
                                         <button 
                                             onClick={() => handleAction('migrate-mappings')}

@@ -17,6 +17,7 @@ import {
     repairBlankTopics,
     backfillExplanations,
     bulkUploadQuestions,
+    bulkUploadMappings,
     normalizeTopics,
     APPROVED_SUBJECTS
 } from "./_lib/scraper-service.js";
@@ -153,7 +154,11 @@ export default async function handler(req: any, res: any) {
             
             case 'save-row': {
                 const tableName = sheet.toLowerCase();
-                if (supabase) await upsertSupabaseData(tableName, [rowData]);
+                if (supabase) {
+                    const dataToUpsert = { ...rowData };
+                    if (tableName === 'syllabus') delete dataToUpsert.micro_topics;
+                    await upsertSupabaseData(tableName, [dataToUpsert]);
+                }
                 
                 // Automatically generate syllabus for new exams
                 if (tableName === 'exams') {

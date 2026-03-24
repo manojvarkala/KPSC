@@ -618,8 +618,7 @@ export async function generateSyllabusForExam(exam: { id: string, title_en: stri
         title: t.topic,
         subject: t.subject,
         questions: t.questions,
-        duration: t.duration,
-        micro_topics: ''
+        duration: t.duration
     }));
 
     // Delete existing syllabus for this exam to avoid duplicates
@@ -960,7 +959,7 @@ export async function syncSupabaseToSheets() {
     const tables = [
         { name: 'Exams', table: 'exams', cols: ['id', 'title_ml', 'title_en', 'description_ml', 'description_en', 'category', 'level', 'icon_type'] },
         { name: 'QuestionBank', table: 'questionbank', cols: ['id', 'topic', 'question', 'options', 'correct_answer_index', 'subject', 'difficulty', 'explanation'] },
-        { name: 'Syllabus', table: 'syllabus', cols: ['id', 'exam_id', 'title', 'questions', 'duration', 'subject', 'topic', 'micro_topics'] },
+        { name: 'Syllabus', table: 'syllabus', cols: ['id', 'exam_id', 'title', 'questions', 'duration', 'subject', 'topic'] },
         { name: 'TopicMappings', table: 'topic_mappings', cols: ['id', 'subject', 'topic', 'micro_topic'] },
         { name: 'Bookstore', table: 'bookstore', cols: ['id', 'title', 'author', 'imageUrl', 'amazonLink'] }
     ];
@@ -1170,7 +1169,7 @@ export async function syncAllFromSheetsToSupabase() {
     if (!supabase) throw new Error("No Supabase.");
     const tables = [
         { sheet: 'Exams', supabase: 'exams', map: (r: any[]) => ({ id: r[0], title_ml: r[1], title_en: r[2], description_ml: r[3], description_en: r[4], category: r[5], level: r[6], icon_type: r[7] }) },
-        { sheet: 'Syllabus', supabase: 'syllabus', map: (r: any[]) => ({ id: r[0], exam_id: r[1], title: r[2], questions: parseInt(r[3] || '0'), duration: parseInt(r[4] || '0'), subject: r[5], topic: r[6], micro_topics: r[7] }) },
+        { sheet: 'Syllabus', supabase: 'syllabus', map: (r: any[]) => ({ id: r[0], exam_id: r[1], title: r[2], questions: parseInt(r[3] || '0'), duration: parseInt(r[4] || '0'), subject: r[5], topic: r[6] }) },
         { sheet: 'TopicMappings', supabase: 'topic_mappings', map: (r: any[]) => ({ id: r[0] ? parseInt(r[0]) : undefined, subject: r[1], topic: r[2], micro_topic: r[3] }) },
         { sheet: 'QuestionBank', supabase: 'questionbank', map: (r: any[]) => ({ id: parseInt(r[0]), topic: r[1], question: r[2], options: smartParseOptions(r[3]), correct_answer_index: parseInt(r[4] || '1'), subject: r[5], difficulty: r[6], explanation: r[7] }) }
     ];
