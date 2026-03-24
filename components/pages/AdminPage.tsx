@@ -103,11 +103,11 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     getSettings(),
                     adminOp('get-topic-mappings')
                 ]);
-                setExams(examRes.exams || []);
-                setSubscriptions(subs || []);
-                setBooks(bks || []);
-                if (s) setSettings(s);
-                setTopicMappings(mappings || []);
+                setExams(Array.isArray(examRes?.exams) ? examRes.exams : []);
+                setSubscriptions(Array.isArray(subs) ? subs : []);
+                setBooks(Array.isArray(bks) ? bks : []);
+                if (s && !s.error) setSettings(s);
+                setTopicMappings(Array.isArray(mappings) ? mappings : []);
                 
                 if (activeTab === 'qbank') {
                     const report = await adminOp('get-audit-report');
@@ -161,10 +161,65 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         try {
             const r = await adminOp(action, payload);
             setStatus(r.message || "Action completed successfully.");
-            if (['delete-row', 'rebuild-db', 'sync-to-sheets', 'run-daily-sync', 'run-book-scraper', 'save-row', 'run-batch-qa', 'run-language-repair', 'run-topic-repair', 'run-explanation-repair', 'run-all-gaps', 'run-targeted-gap-fill', 'normalize-topics', 'normalize-subjects', 'repair-options', 'rebuild-syllabus', 'rebuild-hsst-syllabus', 'upload-questions', 'save-topic-mapping', 'delete-topic-mapping', 'migrate-mappings'].includes(action)) {
+            if (['delete-row', 'rebuild-db', 'sync-to-sheets', 'run-daily-sync', 'run-book-scraper', 'save-row', 'run-batch-qa', 'run-language-repair', 'run-topic-repair', 'run-explanation-repair', 'run-all-gaps', 'run-targeted-gap-fill', 'normalize-topics', 'normalize-subjects', 'repair-options', 'rebuild-syllabus', 'rebuild-hsst-syllabus', 'upload-questions', 'upload-mappings', 'save-topic-mapping', 'delete-topic-mapping', 'migrate-mappings'].includes(action)) {
                 await refreshData(true);
             }
         } catch(e:any) { setStatus(e.message); setIsError(true); }
+    };
+
+    const handleBulkUploadMappings = async () => {
+        if (!csvText.trim()) return;
+        setLoading(true);
+        setStatus("Parsing CSV and uploading mappings...");
+        setIsError(false);
+        try {
+            const lines = csvText.split('\n').filter(l => l.trim());
+            const mappings = lines.map(line => {
+                const parts: string[] = [];
+                let current = '';
+                let inQuotes = false;
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        parts.push(current.trim());
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                parts.push(current.trim());
+
+                // Format: "id","subject","topic","micro_topic" OR "subject","topic","micro_topic"
+                if (parts.length === 3) {
+                    return {
+                        id: undefined,
+                        subject: parts[0],
+                        topic: parts[1],
+                        micro_topic: parts[2]
+                    };
+                } else {
+                    const idVal = parseInt(parts[0]);
+                    return {
+                        id: isNaN(idVal) ? undefined : idVal,
+                        subject: parts[1],
+                        topic: parts[2],
+                        micro_topic: parts[3]
+                    };
+                }
+            });
+
+            const res = await adminOp('upload-mappings', { mappings });
+            setStatus(res.message || 'Mappings uploaded successfully');
+            setCsvText('');
+            await refreshData(true);
+        } catch (err: any) {
+            setIsError(true);
+            setStatus(err.message || 'Failed to upload mappings');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleBulkUpload = async () => {
@@ -482,7 +537,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                             Use the "Topic Normalization" tool to map these to approved syllabus topics. (Processes 500 questions per click).
                                         </p>
                                         <div className="flex flex-wrap gap-2">
-                                            {auditReport.unapprovedTopics.map(t => (
+                                            {(auditReport?.unapprovedTopics || []).map(t => (
                                                 <span key={t} className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-[9px] font-black uppercase border border-orange-200">
                                                     {t}
                                                 </span>
@@ -503,7 +558,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                             Use the "Topic Repair" tool to fix these automatically.
                                         </p>
                                         <div className="flex flex-wrap gap-2">
-                                            {auditReport.subjectMismatches.map(s => (
+                                            {(auditReport?.subjectMismatches || []).map(s => (
                                                 <span key={s} className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-[9px] font-black uppercase border border-red-200">
                                                     {s}
                                                 </span>
@@ -512,7 +567,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                         <div className="mt-6 pt-6 border-t border-red-100 dark:border-red-800">
                                             <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-2">Approved List (Use these exactly):</p>
                                             <div className="flex flex-wrap gap-1">
-                                                {auditReport.approvedSubjects.map(s => (
+                                                {(auditReport?.approvedSubjects || []).map(s => (
                                                     <span key={s} className="bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded text-[8px] font-bold">
                                                         {s}
                                                     </span>
@@ -591,7 +646,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                         className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border-none font-bold text-sm shadow-inner min-w-[250px] outline-none"
                                     >
                                         <option value="">Select an Exam</option>
-                                        {exams.map(ex => <option key={ex.id} value={ex.id}>{ex.title.ml}</option>)}
+                                        {(Array.isArray(exams) ? exams : []).map(ex => <option key={ex.id} value={ex.id}>{ex.title.ml}</option>)}
                                     </select>
                                 </div>
 
@@ -606,7 +661,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                                {syllabusItems.map(item => (
+                                                {(Array.isArray(syllabusItems) ? syllabusItems : []).map(item => (
                                                     <tr key={item.id} className="text-sm font-bold">
                                                         <td className="px-8 py-6">{item.topic}</td>
                                                         <td className="px-8 py-6"><span className="text-[10px] text-slate-400">{item.subject}</span></td>
@@ -676,10 +731,11 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                         />
                                         <div className="flex justify-end">
                                             <button 
-                                                onClick={() => handleAction('upload-mappings')}
-                                                className="bg-indigo-600 text-white font-black px-10 py-4 rounded-2xl shadow-lg hover:bg-indigo-700 transition-all text-[10px] uppercase tracking-widest"
+                                                onClick={handleBulkUploadMappings}
+                                                disabled={!csvText.trim() || loading}
+                                                className="bg-indigo-600 text-white font-black px-10 py-4 rounded-2xl shadow-lg hover:bg-indigo-700 transition-all text-[10px] uppercase tracking-widest disabled:opacity-50"
                                             >
-                                                Upload Mappings
+                                                {loading ? 'Uploading...' : 'Upload Mappings'}
                                             </button>
                                         </div>
                                     </div>
@@ -713,7 +769,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                            {topicMappings.map(mapping => (
+                                            {(Array.isArray(topicMappings) ? topicMappings : []).map(mapping => (
                                                 <tr key={mapping.id} className="text-sm font-bold">
                                                     <td className="px-8 py-4">
                                                         <select 
@@ -725,7 +781,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                                             }}
                                                             className="bg-white dark:bg-slate-800 p-2 rounded-lg border-none text-[10px] font-bold shadow-inner outline-none w-full"
                                                         >
-                                                            {auditReport?.approvedSubjects.map(s => <option key={s} value={s}>{s}</option>)}
+                                                            {(auditReport?.approvedSubjects || []).map(s => <option key={s} value={s}>{s}</option>)}
                                                         </select>
                                                     </td>
                                                     <td className="px-8 py-4">
@@ -908,7 +964,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {exams.map(ex => (
+                                    {(Array.isArray(exams) ? exams : []).map(ex => (
                                         <div key={ex.id} className="bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between shadow-sm">
                                             <div className="flex items-center space-x-4">
                                                 <div className="p-3 bg-white dark:bg-slate-800 rounded-xl shadow-sm"><AcademicCapIcon className="h-6 w-6 text-indigo-600" /></div>
@@ -936,7 +992,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     </button>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {books.map(book => (
+                                    {(Array.isArray(books) ? books : []).map(book => (
                                         <div key={book.id} className="bg-slate-50 dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col">
                                             <div className="aspect-[3/4] bg-white dark:bg-slate-800 rounded-2xl mb-4 overflow-hidden shadow-inner flex items-center justify-center">
                                                 {book.imageUrl ? <img src={book.imageUrl} alt={book.title} className="w-full h-full object-cover" /> : <BookOpenIcon className="h-12 w-12 text-slate-200" />}
@@ -962,7 +1018,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                             <tr><th className="px-8 py-5">User ID</th><th className="px-8 py-5">Status</th><th className="px-8 py-5">Expiry</th><th className="px-8 py-5 text-right">Actions</th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                            {subscriptions.map(sub => (
+                                            {(Array.isArray(subscriptions) ? subscriptions : []).map(sub => (
                                                 <tr key={sub.id} className="text-sm font-bold">
                                                     <td className="px-8 py-6 font-mono text-[10px]">{sub.user_id}</td>
                                                     <td className="px-8 py-6">

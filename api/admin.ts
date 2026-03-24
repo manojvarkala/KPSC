@@ -104,7 +104,7 @@ export default async function handler(req: any, res: any) {
     const body: any = await getRequestBody(req);
     // Support action from both body and query for maximum resilience
     const action = body?.action || req.query?.action;
-    const { id, resultData, sheet, data, topic, setting, questions, rowData, feedback } = body || {};
+    const { id, resultData, sheet, data, topic, setting, questions, mappings, rowData, feedback } = body || {};
 
     if (action === 'save-result') {
         try {
@@ -150,7 +150,7 @@ export default async function handler(req: any, res: any) {
             case 'run-explanation-repair': return res.status(200).json(await backfillExplanations());
             case 'normalize-topics': return res.status(200).json(await normalizeTopics());
             case 'upload-questions': return res.status(200).json(await bulkUploadQuestions(questions));
-            case 'upload-mappings': return res.status(200).json(await bulkUploadMappings(questions));
+            case 'upload-mappings': return res.status(200).json(await bulkUploadMappings(mappings));
             
             case 'save-row': {
                 const tableName = sheet.toLowerCase();
@@ -403,32 +403,9 @@ export default async function handler(req: any, res: any) {
                 const { data: settings } = await supabase.from('settings').select('value').eq('key', 'topic_mappings').single();
                 const mappings: Record<string, string[]> = settings?.value ? JSON.parse(settings.value) : {};
                 
-                const updates = (sData || []).map(s => {
-                    const topic = s.topic || s.title;
-                    if (!topic) return null;
-                    
-                    const matchingKey = Object.keys(mappings).find(k => k.toLowerCase() === topic.toLowerCase());
-                    const mapped = matchingKey ? (mappings[matchingKey] || []) : [];
-                    
-                    if (mapped.length > 0) {
-                        const existing = String(s.micro_topics || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
-                        const combined = Array.from(new Set([...existing, ...mapped.map(t => t.toLowerCase().trim())]));
-                        const newValue = combined.join(', ');
-                        if (newValue !== (s.micro_topics || '')) {
-                            return { id: s.id, micro_topics: newValue };
-                        }
-                    }
-                    return null;
-                }).filter(Boolean) as any[];
-                
-                if (updates.length > 0) {
-                    for (let i = 0; i < updates.length; i += 50) {
-                        await upsertSupabaseData('syllabus', updates.slice(i, i + 50), 'id');
-                    }
-                    await syncSupabaseToSheets();
-                    return res.status(200).json({ message: `Synced mappings for ${updates.length} syllabus entries.` });
-                }
-                return res.status(200).json({ message: "All syllabus entries are already synced with global mappings." });
+                // This tool is legacy as micro_topics column was removed from syllabus table.
+                // We now use the topic_mappings table for normalization.
+                return res.status(200).json({ message: "This tool is deprecated. Use 'Topic Normalization' instead." });
             }
 
             case 'get-topic-mappings': {
@@ -499,12 +476,12 @@ export default async function handler(req: any, res: any) {
                     return { t, sub, composite: `${sub}|${t}` };
                 }).filter(m => m.t);
 
-                const syllabusTopicsLower = Array.from(new Set(syllabusMappings.map(m => m.t)));
-                const syllabusComposites = new Set(syllabusMappings.map(m => m.composite));
+                const syllabusTopicsLower = Array.from(new Set((syllabusMappings || []).map(m => m.t)));
+                const syllabusComposites = new Set((syllabusMappings || []).map(m => m.composite));
 
                 const normalizationTodoIds: number[] = [];
                 const repairTodoIds: number[] = [];
-                const approvedLower = APPROVED_SUBJECTS.map(s => s.toLowerCase().trim());
+                const approvedLower = (APPROVED_SUBJECTS || []).map(s => s.toLowerCase().trim());
                 const subjectMismatches: string[] = [];
                 const unapprovedTopics: string[] = [];
                 let questionSubjectMismatches = 0;
@@ -525,8 +502,8 @@ export default async function handler(req: any, res: any) {
                     const isComboValidInSyllabus = syllabusComposites.has(`${sLower}|${tLower}`);
                     
                     const isMappedInTable = (mData || []).some(m => 
-                        m.subject.toLowerCase().trim() === sLower && 
-                        m.micro_topic.toLowerCase().trim() === tLower
+                        String(m.subject || '').toLowerCase().trim() === sLower && 
+                        String(m.micro_topic || '').toLowerCase().trim() === tLower
                     );
                     
                     const isManualMapped = false; // micro_topics column removed from syllabus
@@ -595,9 +572,9 @@ export default async function handler(req: any, res: any) {
                     
                     // Get mappings from the new table
                     const mappingsForThisSyllabusTopic = (mData || []).filter(m => 
-                        m.subject.toLowerCase().trim() === sSubject && 
-                        m.topic.toLowerCase().trim() === sTopic
-                    ).map(m => m.micro_topic.toLowerCase().trim());
+                        String(m.subject || '').toLowerCase().trim() === sSubject && 
+                        String(m.topic || '').toLowerCase().trim() === sTopic
+                    ).map(m => String(m.micro_topic || '').toLowerCase().trim());
                     
                     // Mappings now come exclusively from the topic_mappings table
                     const allMappedMicroTopics = Array.from(new Set([...mappingsForThisSyllabusTopic]));

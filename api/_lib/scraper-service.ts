@@ -72,6 +72,7 @@ export const APPROVED_TOPICS = Object.values(SYLLABUS_STRUCTURE).flat();
  */
 export async function bulkUploadQuestions(questions: any[]) {
     if (!supabase) throw new Error("Supabase required.");
+    if (!questions || !Array.isArray(questions)) throw new Error("Invalid questions data.");
     if (!questions.length) return { message: "No questions provided." };
 
     const { data: maxIdRow } = await supabase.from('questionbank').select('id').order('id', { ascending: false }).limit(1).single();
@@ -124,6 +125,7 @@ export async function bulkUploadQuestions(questions: any[]) {
 
 export async function bulkUploadMappings(mappings: any[]) {
     if (!supabase) throw new Error("Supabase required.");
+    if (!mappings || !Array.isArray(mappings)) throw new Error("Invalid mappings data.");
     const mapped = mappings.map(r => ({
         id: r.id ? parseInt(r.id) : undefined,
         subject: r.subject,
@@ -1192,16 +1194,79 @@ async function processNormalizationBatch(toRepair: any[], approvedMappings: { to
 export async function syncAllFromSheetsToSupabase() {
     if (!supabase) throw new Error("No Supabase.");
     const tables = [
-        { sheet: 'Exams', supabase: 'exams', map: (r: any[]) => ({ id: r[0], title_ml: r[1], title_en: r[2], description_ml: r[3], description_en: r[4], category: r[5], level: r[6], icon_type: r[7] }) },
-        { sheet: 'Syllabus', supabase: 'syllabus', map: (r: any[]) => ({ exam_id: r[1], title: r[2], questions: parseInt(r[3] || '0'), duration: parseInt(r[4] || '0'), subject: r[5], topic: r[6] }) },
-        { sheet: 'TopicMappings', supabase: 'topic_mappings', map: (r: any[]) => ({ subject: r[1], topic: r[2], micro_topic: r[3] }) },
-        { sheet: 'QuestionBank', supabase: 'questionbank', map: (r: any[]) => ({ topic: r[1], question: r[2], options: smartParseOptions(r[3]), correct_answer_index: parseInt(r[4] || '1'), subject: r[5], difficulty: r[6], explanation: r[7] }) }
+        { 
+            sheet: 'Exams', 
+            supabase: 'exams', 
+            map: (r: any[]) => ({ 
+                id: r[0], 
+                title_ml: r[1], 
+                title_en: r[2], 
+                description_ml: r[3], 
+                description_en: r[4], 
+                category: r[5], 
+                level: r[6], 
+                icon_type: r[7] 
+            }) 
+        },
+        { 
+            sheet: 'Syllabus', 
+            supabase: 'syllabus', 
+            map: (r: any[]) => {
+                // Handle 6 columns (no ID) or 7 columns (with ID)
+                const offset = r.length >= 7 ? 1 : 0;
+                return {
+                    exam_id: r[0 + offset],
+                    title: r[1 + offset],
+                    questions: parseInt(r[2 + offset] || '0'),
+                    duration: parseInt(r[3 + offset] || '0'),
+                    subject: r[4 + offset],
+                    topic: r[5 + offset]
+                };
+            }
+        },
+        { 
+            sheet: 'TopicMappings', 
+            supabase: 'topic_mappings', 
+            map: (r: any[]) => {
+                // Handle 3 columns (no ID) or 4 columns (with ID)
+                const offset = r.length >= 4 ? 1 : 0;
+                return {
+                    subject: r[0 + offset],
+                    topic: r[1 + offset],
+                    micro_topic: r[2 + offset]
+                };
+            }
+        },
+        { 
+            sheet: 'QuestionBank', 
+            supabase: 'questionbank', 
+            map: (r: any[]) => {
+                // Handle 7 columns (no ID) or 8 columns (with ID)
+                const offset = r.length >= 8 ? 1 : 0;
+                return {
+                    topic: r[0 + offset] || 'General',
+                    question: r[1 + offset],
+                    options: smartParseOptions(r[2 + offset]),
+                    correct_answer_index: parseInt(r[3 + offset] || '1'),
+                    subject: r[4 + offset] || 'General Knowledge',
+                    difficulty: r[5 + offset] || 'PSC Level',
+                    explanation: r[6 + offset] || ''
+                };
+            }
+        }
     ];
     for (const t of tables) {
         try {
+            console.log(`Syncing ${t.sheet} -> ${t.supabase}...`);
             const rows = await readSheetData(`${t.sheet}!A2:Z`);
+            console.log(`Read ${rows?.length || 0} rows from ${t.sheet}`);
             if (rows?.length) {
-                const mappedData = rows.filter(r => r[0] || t.sheet === 'TopicMappings').map(t.map as any);
+                // Filter out rows where the first "data" column is empty
+                const mappedData = rows.filter(r => {
+                    return r.some(cell => cell && String(cell).trim() !== '');
+                }).map(t.map as any);
+                
+                console.log(`Mapped ${mappedData.length} valid rows for ${t.supabase}`);
                 
                 if (t.supabase === 'exams') {
                     // Exams use string IDs, upsert is fine
@@ -1209,6 +1274,7 @@ export async function syncAllFromSheetsToSupabase() {
                 } else {
                     // For tables with auto-id (int), delete and insert to avoid "non-DEFAULT value" error
                     // This is a workaround for GENERATED ALWAYS columns
+                    console.log(`Clearing table ${t.supabase}...`);
                     const { error: delError } = await supabase.from(t.supabase).delete().neq('id', -1);
                     if (delError && !delError.message.includes('not find the table')) {
                         console.error(`Delete failed for ${t.supabase}:`, delError.message);
@@ -1216,15 +1282,21 @@ export async function syncAllFromSheetsToSupabase() {
                     }
 
                     // Batch insert to avoid payload limits
+                    let inserted = 0;
                     for (let i = 0; i < mappedData.length; i += 100) {
                         const batch = mappedData.slice(i, i + 100);
                         const { error: insError } = await supabase.from(t.supabase).insert(batch);
                         if (insError) {
-                            if (insError.message.includes('not find the table')) break;
+                            if (insError.message.includes('not find the table')) {
+                                console.warn(`Table ${t.supabase} not found in Supabase. Skipping insert.`);
+                                break;
+                            }
                             console.error(`Insert failed for ${t.supabase} batch ${i}:`, insError.message);
                             break;
                         }
+                        inserted += batch.length;
                     }
+                    console.log(`Successfully inserted ${inserted} rows into ${t.supabase}`);
                 }
             }
         } catch (e: any) {
