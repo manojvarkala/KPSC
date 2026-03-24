@@ -77,16 +77,37 @@ export async function bulkUploadQuestions(questions: any[]) {
     const { data: maxIdRow } = await supabase.from('questionbank').select('id').order('id', { ascending: false }).limit(1).single();
     let currentId = (maxIdRow?.id || 50000) + 1;
 
-    const sanitized = questions.map(q => ({
-        id: q.id || currentId++,
-        topic: q.topic || 'General',
-        question: q.question,
-        options: smartParseOptions(q.options),
-        correct_answer_index: parseInt(String(q.correct_answer_index || q.correctAnswerIndex || 1)),
-        subject: q.subject || 'General Knowledge',
-        difficulty: q.difficulty || 'PSC Level',
-        explanation: q.explanation || ''
-    }));
+    // Fetch mappings for auto-normalization
+    let mData: any[] = [];
+    try {
+        const { data } = await supabase.from('topic_mappings').select('*');
+        mData = data || [];
+    } catch (e) {}
+
+    const sanitized = questions.map(q => {
+        const id = q.id || currentId++;
+        let topic = q.topic || 'General';
+        let subject = q.subject || 'General Knowledge';
+
+        // Auto-normalize if micro-topic matches mapping
+        const tLower = String(topic).toLowerCase().trim();
+        const mapping = mData.find(m => String(m.micro_topic || '').toLowerCase().trim() === tLower);
+        if (mapping) {
+            topic = mapping.topic;
+            subject = mapping.subject;
+        }
+
+        return {
+            id,
+            topic,
+            question: q.question,
+            options: smartParseOptions(q.options),
+            correct_answer_index: parseInt(String(q.correct_answer_index || q.correctAnswerIndex || 1)),
+            subject,
+            difficulty: q.difficulty || 'PSC Level',
+            explanation: q.explanation || ''
+        };
+    });
 
     await upsertSupabaseData('questionbank', sanitized);
     
@@ -109,7 +130,12 @@ export async function bulkUploadMappings(mappings: any[]) {
         topic: r.topic,
         micro_topic: r.micro_topic
     }));
-    await upsertSupabaseData('topic_mappings', mapped, 'id');
+    
+    try {
+        await upsertSupabaseData('topic_mappings', mapped, 'id');
+    } catch (e: any) {
+        console.warn("Could not sync mappings to Supabase (table missing), syncing to Sheets only.");
+    }
     
     const sheetRows = mapped.map(m => ({
         id: String(m.id || ''),
@@ -117,7 +143,7 @@ export async function bulkUploadMappings(mappings: any[]) {
     }));
     await batchUpsertRows('TopicMappings', sheetRows);
     
-    return mapped;
+    return { message: `Successfully uploaded ${mapped.length} mappings to Sheets (Supabase sync skipped if table missing).`, data: mapped };
 }
 
 /**
@@ -989,8 +1015,15 @@ export async function normalizeTopics() {
     if (!supabase) throw new Error("Supabase required.");
     
     // 1. Get approved mappings from syllabus
-    const { data: sData } = await supabase.from('syllabus').select('topic, title, subject, micro_topics');
-    const { data: mData } = await supabase.from('topic_mappings').select('*');
+    const { data: sData } = await supabase.from('syllabus').select('topic, title, subject');
+    
+    let mData: any[] = [];
+    try {
+        const { data } = await supabase.from('topic_mappings').select('*');
+        mData = data || [];
+    } catch (e) {
+        console.warn("topic_mappings table missing, using syllabus only for normalization.");
+    }
     
     const approvedMappings = (sData || []).map(s => ({
         topic: s.topic || s.title || 'General',
@@ -1035,18 +1068,9 @@ export async function normalizeTopics() {
         const sLower = String(q.subject || '').toLowerCase().trim();
 
         // Check mapping table
-        const mapping = (mData || []).find(m => m.micro_topic.toLowerCase().trim() === tLower);
+        const mapping = (mData || []).find(m => String(m.micro_topic || '').toLowerCase().trim() === tLower);
         if (mapping) {
             autoMapped.push({ ...q, subject: mapping.subject, topic: mapping.topic });
-            return;
-        }
-
-        // Check manual micro-topics in syllabus
-        const syllabusMatch = (sData || []).find(s => 
-            String(s.micro_topics || '').toLowerCase().split(',').map(mt => mt.trim()).includes(tLower)
-        );
-        if (syllabusMatch) {
-            autoMapped.push({ ...q, subject: syllabusMatch.subject, topic: syllabusMatch.topic || syllabusMatch.title });
             return;
         }
 
@@ -1169,15 +1193,42 @@ export async function syncAllFromSheetsToSupabase() {
     if (!supabase) throw new Error("No Supabase.");
     const tables = [
         { sheet: 'Exams', supabase: 'exams', map: (r: any[]) => ({ id: r[0], title_ml: r[1], title_en: r[2], description_ml: r[3], description_en: r[4], category: r[5], level: r[6], icon_type: r[7] }) },
-        { sheet: 'Syllabus', supabase: 'syllabus', map: (r: any[]) => ({ id: r[0], exam_id: r[1], title: r[2], questions: parseInt(r[3] || '0'), duration: parseInt(r[4] || '0'), subject: r[5], topic: r[6] }) },
-        { sheet: 'TopicMappings', supabase: 'topic_mappings', map: (r: any[]) => ({ id: r[0] ? parseInt(r[0]) : undefined, subject: r[1], topic: r[2], micro_topic: r[3] }) },
-        { sheet: 'QuestionBank', supabase: 'questionbank', map: (r: any[]) => ({ id: parseInt(r[0]), topic: r[1], question: r[2], options: smartParseOptions(r[3]), correct_answer_index: parseInt(r[4] || '1'), subject: r[5], difficulty: r[6], explanation: r[7] }) }
+        { sheet: 'Syllabus', supabase: 'syllabus', map: (r: any[]) => ({ exam_id: r[1], title: r[2], questions: parseInt(r[3] || '0'), duration: parseInt(r[4] || '0'), subject: r[5], topic: r[6] }) },
+        { sheet: 'TopicMappings', supabase: 'topic_mappings', map: (r: any[]) => ({ subject: r[1], topic: r[2], micro_topic: r[3] }) },
+        { sheet: 'QuestionBank', supabase: 'questionbank', map: (r: any[]) => ({ topic: r[1], question: r[2], options: smartParseOptions(r[3]), correct_answer_index: parseInt(r[4] || '1'), subject: r[5], difficulty: r[6], explanation: r[7] }) }
     ];
     for (const t of tables) {
-        const rows = await readSheetData(`${t.sheet}!A2:Z`);
-        if (rows?.length) {
-            const mappedData = rows.filter(r => r[0]).map(t.map as any);
-            await upsertSupabaseData(t.supabase, mappedData);
+        try {
+            const rows = await readSheetData(`${t.sheet}!A2:Z`);
+            if (rows?.length) {
+                const mappedData = rows.filter(r => r[0] || t.sheet === 'TopicMappings').map(t.map as any);
+                
+                if (t.supabase === 'exams') {
+                    // Exams use string IDs, upsert is fine
+                    await upsertSupabaseData(t.supabase, mappedData);
+                } else {
+                    // For tables with auto-id (int), delete and insert to avoid "non-DEFAULT value" error
+                    // This is a workaround for GENERATED ALWAYS columns
+                    const { error: delError } = await supabase.from(t.supabase).delete().neq('id', -1);
+                    if (delError && !delError.message.includes('not find the table')) {
+                        console.error(`Delete failed for ${t.supabase}:`, delError.message);
+                        continue;
+                    }
+
+                    // Batch insert to avoid payload limits
+                    for (let i = 0; i < mappedData.length; i += 100) {
+                        const batch = mappedData.slice(i, i + 100);
+                        const { error: insError } = await supabase.from(t.supabase).insert(batch);
+                        if (insError) {
+                            if (insError.message.includes('not find the table')) break;
+                            console.error(`Insert failed for ${t.supabase} batch ${i}:`, insError.message);
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (e: any) {
+            console.error(`Sync failed for table ${t.supabase}:`, e.message);
         }
     }
     return { message: "Sync complete." };

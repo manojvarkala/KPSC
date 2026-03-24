@@ -191,17 +191,31 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 }
                 parts.push(current.trim());
 
-                const idVal = parseInt(parts[0]);
-                return {
-                    id: isNaN(idVal) ? undefined : idVal,
-                    topic: parts[1] || 'General',
-                    question: parts[2],
-                    options: parts[3],
-                    correct_answer_index: parseInt(parts[4] || '0'),
-                    subject: parts[5] || 'General Knowledge',
-                    difficulty: parts[6] || 'Easy',
-                    explanation: parts[7] || ''
-                };
+                // Detect format: 7 columns (no ID) or 8 columns (with ID)
+                if (parts.length === 7) {
+                    return {
+                        id: undefined,
+                        topic: parts[0] || 'General',
+                        question: parts[1],
+                        options: parts[2],
+                        correct_answer_index: parseInt(parts[3] || '0'),
+                        subject: parts[4] || 'General Knowledge',
+                        difficulty: parts[5] || 'Easy',
+                        explanation: parts[6] || ''
+                    };
+                } else {
+                    const idVal = parseInt(parts[0]);
+                    return {
+                        id: isNaN(idVal) ? undefined : idVal,
+                        topic: parts[1] || 'General',
+                        question: parts[2],
+                        options: parts[3],
+                        correct_answer_index: parseInt(parts[4] || '0'),
+                        subject: parts[5] || 'General Knowledge',
+                        difficulty: parts[6] || 'Easy',
+                        explanation: parts[7] || ''
+                    };
+                }
             });
 
             const res = await adminOp('upload-questions', { questions });
