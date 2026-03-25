@@ -21,7 +21,7 @@ export async function upsertSupabaseData(table: string, data: any[], onConflict:
         const entry: any = { ...item };
         
         // Define tables with integer IDs
-        const intIdTables = ['questionbank', 'results', 'liveupdates', 'syllabus', 'bookstore'];
+        const intIdTables = ['questionbank', 'results', 'liveupdates', 'syllabus', 'bookstore', 'topic_mappings'];
         if (intIdTables.includes(cleanTable)) {
             if (entry.id !== undefined && entry.id !== null && entry.id !== '') {
                 const parsedId = parseInt(String(entry.id));
@@ -31,6 +31,8 @@ export async function upsertSupabaseData(table: string, data: any[], onConflict:
                     // If it's a string but the table expects an int, we need a deterministic numeric ID
                     if (cleanTable === 'syllabus' && entry.exam_id && entry.topic) {
                         entry.id = generateDeterministicIntId(`${entry.exam_id}_${entry.topic}`);
+                    } else if (cleanTable === 'topic_mappings' && entry.subject && entry.topic && entry.micro_topic) {
+                        entry.id = generateDeterministicIntId(`${entry.subject}_${entry.topic}_${entry.micro_topic}`);
                     } else if (cleanTable === 'bookstore') {
                         entry.id = generateDeterministicIntId(String(entry.id), true);
                     } else {
@@ -40,6 +42,9 @@ export async function upsertSupabaseData(table: string, data: any[], onConflict:
             } else if (cleanTable === 'syllabus' && entry.exam_id && entry.topic) {
                 // Generate ID for syllabus if missing
                 entry.id = generateDeterministicIntId(`${entry.exam_id}_${entry.topic}`);
+            } else if (cleanTable === 'topic_mappings' && entry.subject && entry.topic && entry.micro_topic) {
+                // Generate ID for topic_mappings if missing
+                entry.id = generateDeterministicIntId(`${entry.subject}_${entry.topic}_${entry.micro_topic}`);
             }
         } else if (entry.id !== undefined && entry.id !== null) {
             entry.id = String(entry.id).trim();

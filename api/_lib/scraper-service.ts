@@ -1301,12 +1301,12 @@ export async function syncAllFromSheetsToSupabase(targetTable?: string) {
                     const batchSize = 100;
                     for (let i = 0; i < mappedData.length; i += batchSize) {
                         const batch = mappedData.slice(i, i + batchSize);
-                        const { error: insError } = await supabase.from(t.supabase).insert(batch);
-                        if (insError) {
+                        try {
+                            await upsertSupabaseData(t.supabase, batch);
+                            inserted += batch.length;
+                        } catch (insError: any) {
                             console.error(`Insert failed for ${t.supabase} batch:`, insError.message);
                             lastError = insError.message;
-                        } else {
-                            inserted += batch.length;
                         }
                     }
                     report.push({ 
