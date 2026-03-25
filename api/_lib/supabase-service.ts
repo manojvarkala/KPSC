@@ -45,6 +45,9 @@ export async function upsertSupabaseData(table: string, data: any[], onConflict:
             } else if (cleanTable === 'topic_mappings' && entry.subject && entry.topic && entry.micro_topic) {
                 // Generate ID for topic_mappings if missing
                 entry.id = generateDeterministicIntId(`${entry.subject}_${entry.topic}_${entry.micro_topic}`);
+            } else if (cleanTable === 'questionbank' && entry.question) {
+                // Generate ID for questionbank if missing
+                entry.id = generateDeterministicIntId(String(entry.question), true);
             }
         } else if (entry.id !== undefined && entry.id !== null) {
             entry.id = String(entry.id).trim();

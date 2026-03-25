@@ -1290,12 +1290,25 @@ export async function syncAllFromSheetsToSupabase(targetTable?: string) {
 
             if (mappedData.length > 0) {
                 if (t.supabase === 'exams') {
-                    await upsertSupabaseData(t.supabase, mappedData);
-                    report.push({ table: t.supabase, status: 'success', rows: mappedData.length, total: rows.length });
+                    try {
+                        await upsertSupabaseData(t.supabase, mappedData);
+                        report.push({ 
+                            table: t.supabase, 
+                            status: 'success', 
+                            rows: mappedData.length, 
+                            total: rows.length,
+                            sample: rows[0] ? rows[0].slice(0, 3) : []
+                        });
+                    } catch (insError: any) {
+                        console.error(`Insert failed for ${t.supabase}:`, insError.message);
+                        report.push({ 
+                            table: t.supabase, 
+                            status: 'error', 
+                            error: insError.message,
+                            sample: rows[0] ? rows[0].slice(0, 3) : []
+                        });
+                    }
                 } else {
-                    const { error: delError } = await supabase.from(t.supabase).delete().neq('id', -1);
-                    if (delError) console.error(`Clear failed for ${t.supabase}:`, delError.message);
-
                     let inserted = 0;
                     let lastError = null;
                     const batchSize = 100;
