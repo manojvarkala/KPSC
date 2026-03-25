@@ -424,11 +424,12 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     <>
                         {activeTab === 'automation' && (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <ToolCard title="Full DB Sync" icon={ArrowPathIcon} action="rebuild-db" color="bg-red-600" desc="Synchronizes all records from Google Sheets to Supabase production database." />
+                                <ToolCard title="Sync All (Safe)" icon={ArrowPathIcon} action="rebuild-db" color="bg-indigo-600" desc="Performs a safe, ordered sync of all tables (Exams -> Syllabus -> Mappings -> QBank) using upsert logic." />
                                 <ToolCard title="Sync Exams" icon={AcademicCapIcon} action="sync-exams" color="bg-slate-800" desc="Sync only the Exams table from Sheets." />
                                 <ToolCard title="Sync Syllabus" icon={PlusIcon} action="sync-syllabus" color="bg-amber-600" desc="Sync only the Syllabus table from Sheets." />
                                 <ToolCard title="Sync Mappings" icon={TagIcon} action="sync-mappings" color="bg-blue-600" desc="Sync only the Topic Mappings table from Sheets." />
                                 <ToolCard title="Sync Q-Bank" icon={ClipboardListIcon} action="sync-qbank" color="bg-rose-600" desc="Sync only the Question Bank table from Sheets." />
+                                <ToolCard title="Full DB Sync (Wipe)" icon={XMarkIcon} action="rebuild-db" color="bg-red-600" desc="DANGEROUS: Synchronizes all records. (Currently identical to Safe Sync but reserved for future wipe logic)." />
                                 <ToolCard title="Push to Sheets" icon={CloudArrowUpIcon} action="sync-to-sheets" color="bg-orange-600" desc="Backup Supabase data back to Google Sheets (Emergency Use)." />
                                 <ToolCard title="PSC Daily Sync" icon={SparklesIcon} action="run-daily-sync" color="bg-indigo-600" desc="Full cycle sync: Jobs, Live Updates, CA, GK and Gap Filler." />
                                 <ToolCard title="Language Repair" icon={LanguageIcon} action="run-language-repair" color="bg-cyan-600" desc="Fixes questions that were accidentally translated to Malayalam instead of English." />

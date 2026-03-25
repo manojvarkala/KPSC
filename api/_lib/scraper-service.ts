@@ -1261,14 +1261,21 @@ export async function syncAllFromSheetsToSupabase(targetTable?: string) {
                 continue;
             }
 
-            // Robust ID detection: If the first cell is a number, it's likely an ID column from an export
+            // Robust ID detection: If the first cell is a number AND the row has more columns than expected, it's an ID column
             let offset = 0;
-            if (['exams', 'syllabus', 'topic_mappings', 'questionbank'].includes(t.supabase)) {
+            const expectedCols: Record<string, number> = {
+                'exams': 8,
+                'syllabus': 6,
+                'topic_mappings': 3,
+                'questionbank': 7
+            };
+            
+            if (expectedCols[t.supabase] && rows[0].length > expectedCols[t.supabase]) {
                 const firstCell = String(rows[0][0] || '').trim();
                 const isNumeric = firstCell !== '' && !isNaN(Number(firstCell)) && /^\d+$/.test(firstCell);
                 if (isNumeric) {
                     offset = 1;
-                    console.log(`Detected ID column in ${t.sheet}, using offset 1`);
+                    console.log(`Detected ID column in ${t.sheet} (Cols: ${rows[0].length}, Expected: ${expectedCols[t.supabase]}), using offset 1`);
                 }
             }
 
