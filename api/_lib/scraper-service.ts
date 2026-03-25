@@ -28,11 +28,12 @@ export const APPROVED_SUBJECTS = [
     "Current Affairs", "Educational Psychology / Pedagogy", "Electrical Engineering", "English",
     "Environment", "General Knowledge", "General Knowledge / Static GK", "General Science / Science & Tech",
     "Indian Economy", "Indian Geography", "Indian History", "Indian Polity / Constitution",
-    "Kerala Geography", "Kerala History", "Kerala History / Renaissance", "Kerala Specific GK",
+    "Kerala Geography", "Kerala History", "Kerala History / Renaissance", "Kerala History & Renaissance", "Kerala Specific GK",
     "Malayalam", "Nursing Science / Health Care", "Physics", "Quantitative Aptitude",
     "Reasoning / Mental Ability", "Social Science / Sociology", "Mathematics", "Botany", "Zoology",
     "Economics", "Political Science", "Statistics", "Geography", "Sanskrit", "Kannada", "Philosophy",
-    "Psychology", "Commerce", "Physical Education", "Music", "Arabic", "Hindi"
+    "Psychology", "Commerce", "Physical Education", "Music", "Arabic", "Hindi",
+    "Civil Engineering", "Mechanical Engineering", "General Knowledge & Current Affairs", "Library Science", "General", "Language"
 ];
 
 export const SYLLABUS_STRUCTURE = {
@@ -1261,7 +1262,9 @@ export async function syncAllFromSheetsToSupabase(targetTable?: string) {
                 continue;
             }
 
-            // Robust ID detection: If the first cell is a number AND the row has more columns than expected, it's an ID column
+            // Robust ID detection: 
+            // 1. If the first cell is a number AND the row has more columns than expected, it's an ID column
+            // 2. For 'exams', if the first cell is a number, it's ALWAYS an offset because exam IDs are strings
             let offset = 0;
             const expectedCols: Record<string, number> = {
                 'exams': 8,
@@ -1270,12 +1273,13 @@ export async function syncAllFromSheetsToSupabase(targetTable?: string) {
                 'questionbank': 7
             };
             
-            if (expectedCols[t.supabase] && rows[0].length > expectedCols[t.supabase]) {
-                const firstCell = String(rows[0][0] || '').trim();
-                const isNumeric = firstCell !== '' && !isNaN(Number(firstCell)) && /^\d+$/.test(firstCell);
-                if (isNumeric) {
+            const firstCell = String(rows[0][0] || '').trim();
+            const isNumeric = firstCell !== '' && !isNaN(Number(firstCell)) && /^\d+$/.test(firstCell);
+
+            if (isNumeric) {
+                if (t.supabase === 'exams' || (expectedCols[t.supabase] && rows[0].length > expectedCols[t.supabase])) {
                     offset = 1;
-                    console.log(`Detected ID column in ${t.sheet} (Cols: ${rows[0].length}, Expected: ${expectedCols[t.supabase]}), using offset 1`);
+                    console.log(`Detected ID column in ${t.sheet} (First Cell: "${firstCell}", Cols: ${rows[0].length}), using offset 1`);
                 }
             }
 
