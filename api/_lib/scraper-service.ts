@@ -1283,7 +1283,7 @@ export async function syncAllFromSheetsToSupabase(targetTable?: string) {
                     return r[0 + offset] && r[1 + offset];
                 }
                 if (t.supabase === 'exams') {
-                    return r[0] && r[1];
+                    return r[0 + offset] && r[1 + offset];
                 }
                 return true;
             }).map(r => t.map(r, offset));
