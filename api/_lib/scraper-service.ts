@@ -1197,15 +1197,15 @@ export async function syncAllFromSheetsToSupabase(targetTable?: string) {
         { 
             sheet: 'Exams', 
             supabase: 'exams', 
-            map: (r: any[]) => ({ 
-                id: String(r[0] || '').trim(), 
-                title_ml: r[1], 
-                title_en: r[2], 
-                description_ml: r[3], 
-                description_en: r[4], 
-                category: r[5], 
-                level: r[6], 
-                icon_type: r[7] 
+            map: (r: any[], offset: number) => ({ 
+                id: String(r[0 + offset] || '').trim(), 
+                title_ml: r[1 + offset], 
+                title_en: r[2 + offset], 
+                description_ml: r[3 + offset], 
+                description_en: r[4 + offset], 
+                category: r[5 + offset], 
+                level: r[6 + offset], 
+                icon_type: r[7 + offset] 
             }) 
         },
         { 
@@ -1261,15 +1261,14 @@ export async function syncAllFromSheetsToSupabase(targetTable?: string) {
                 continue;
             }
 
-            // Robust ID detection: Check if the first column of the first few rows looks like an ID (integer)
+            // Robust ID detection: If the first cell is a number, it's likely an ID column from an export
             let offset = 0;
-            if (['syllabus', 'topic_mappings', 'questionbank'].includes(t.supabase)) {
-                const firstRow = rows[0];
-                const firstCell = String(firstRow[0] || '').trim();
-                const isNumeric = !isNaN(parseInt(firstCell)) && /^\d+$/.test(firstCell);
-                const baseLen = t.supabase === 'topic_mappings' ? 3 : (t.supabase === 'syllabus' ? 6 : 7);
-                if (isNumeric && firstRow.length > baseLen) {
+            if (['exams', 'syllabus', 'topic_mappings', 'questionbank'].includes(t.supabase)) {
+                const firstCell = String(rows[0][0] || '').trim();
+                const isNumeric = firstCell !== '' && !isNaN(Number(firstCell)) && /^\d+$/.test(firstCell);
+                if (isNumeric) {
                     offset = 1;
+                    console.log(`Detected ID column in ${t.sheet}, using offset 1`);
                 }
             }
 
@@ -1292,27 +1291,30 @@ export async function syncAllFromSheetsToSupabase(targetTable?: string) {
             if (mappedData.length > 0) {
                 if (t.supabase === 'exams') {
                     await upsertSupabaseData(t.supabase, mappedData);
-                    report.push({ table: t.supabase, status: 'success', rows: mappedData.length });
+                    report.push({ table: t.supabase, status: 'success', rows: mappedData.length, total: rows.length });
                 } else {
                     const { error: delError } = await supabase.from(t.supabase).delete().neq('id', -1);
                     if (delError) console.error(`Clear failed for ${t.supabase}:`, delError.message);
 
                     let inserted = 0;
+                    let lastError = null;
                     const batchSize = 100;
                     for (let i = 0; i < mappedData.length; i += batchSize) {
                         const batch = mappedData.slice(i, i + batchSize);
                         const { error: insError } = await supabase.from(t.supabase).insert(batch);
                         if (insError) {
                             console.error(`Insert failed for ${t.supabase} batch:`, insError.message);
+                            lastError = insError.message;
                         } else {
                             inserted += batch.length;
                         }
                     }
                     report.push({ 
                         table: t.supabase, 
-                        status: 'success', 
+                        status: inserted > 0 ? 'success' : 'error', 
                         rows: inserted, 
                         total: rows.length,
+                        error: lastError,
                         sample: rows[0] ? rows[0].slice(0, 3) : []
                     });
                 }

@@ -163,7 +163,7 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             let msg = r.message || "Action completed successfully.";
             if (r.report && Array.isArray(r.report)) {
                 msg += "\n\nReport:\n" + r.report.map((t: any) => 
-                    `- ${t.table}: ${t.status}${t.rows !== undefined ? ` (${t.rows} rows)` : ''}${t.reason ? ` - ${t.reason}` : ''}${t.error ? ` - Error: ${t.error}` : ''}${t.sample ? ` [Sample: ${JSON.stringify(t.sample)}]` : ''}`
+                    `- ${t.table}: ${t.status}${t.rows !== undefined ? ` (${t.rows}/${t.total || '?'} rows)` : ''}${t.reason ? ` - ${t.reason}` : ''}${t.error ? ` - Error: ${t.error}` : ''}${t.sample ? ` [Sample: ${JSON.stringify(t.sample)}]` : ''}`
                 ).join('\n');
             }
             setStatus(msg);
