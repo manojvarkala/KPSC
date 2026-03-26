@@ -40,6 +40,7 @@ export const translations = {
     dailyFacts: "Daily Facts",
     resources: "വിഭവങ്ങൾ",
     quizzes: "ക്വിസുകൾ",
+    practiceExams: "പ്രാക്ടീസ് പരീക്ഷകൾ",
     mockTests: "മോക്ക് ടെസ്റ്റുകൾ",
     studyMaterials: "പഠന സാമഗ്രികൾ",
     currentAffairs: "ആനുകാലികം",
@@ -105,7 +106,9 @@ export const translations = {
       Teachers: "അധ്യാപക പരീക്ഷകൾ",
       Technical: "സാങ്കേതിക പരീക്ഷകൾ",
       Special: "സ്പെഷ്യൽ പരീക്ഷകൾ",
-      Live: "പുതിയ അറിയിപ്പുകൾ"
+      Live: "പുതിയ അറിയിപ്പുകൾ",
+      practiceExams: "പ്രാക്ടീസ് പരീക്ഷകൾ (വിഷയങ്ങൾ അനുസരിച്ച്)",
+      mockTests: "മോക്ക് ടെസ്റ്റുകൾ (പ്രിലിമിനറി & മെയിൻ മോഡലുകൾ)"
     },
     notifications: {
         title: "പുതിയ അറിയിപ്പുകൾ",

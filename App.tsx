@@ -14,7 +14,7 @@ import DisclosurePage from './components/pages/DisclosurePage';
 import DisclaimerPage from './components/pages/DisclaimerPage';
 import BookstorePage from './components/pages/BookstorePage';
 import ExamCalendarPage from './components/pages/ExamCalendarPage';
-import QuizHomePage from './components/pages/QuizHomePage';
+import PracticeExamsHomePage from './components/pages/PracticeExamsHomePage';
 import MockTestHomePage from './components/pages/MockTestHomePage';
 import UpgradePage from './components/pages/UpgradePage';
 import PscLiveUpdatesPage from './components/pages/PscLiveUpdatesPage';
@@ -179,7 +179,7 @@ const App: React.FC = () => {
             case 'test': return activeTest ? <TestPage activeTest={activeTest} subscriptionStatus={subscriptionStatus} onTestComplete={(s, t, st, q, a) => { setTestResult({ score: s, total: t, stats: st, questions: q, answers: a }); handleNavigate('results'); }} onBack={() => window.history.back()} onNavigateToUpgrade={() => handleNavigate('upgrade')} /> : <div className="text-center p-20">Loading...</div>;
             case 'results': return testResult ? <TestResultPage score={testResult.score} total={testResult.total} stats={testResult.stats} questions={testResult.questions} answers={testResult.answers} onBackToPrevious={() => handleNavigate('dashboard')} /> : <Dashboard onNavigateToExam={e => handleNavigate(`exam_details/${e.id}`)} onNavigate={handleNavigate} onStartStudy={(t) => handleNavigate(`study_material/${encodeURIComponent(t)}`)} />;
             case 'bookstore': return <BookstorePage onBack={() => handleNavigate('dashboard')} />;
-            case 'quiz_home': return <QuizHomePage onBack={() => handleNavigate('dashboard')} onStartQuiz={(c) => handleNavigate(`test/${encodeURIComponent(c.title.en)}/mixed/15/${encodeURIComponent(c.title.ml)}`)} subscriptionStatus={subscriptionStatus} />;
+            case 'quiz_home': return <PracticeExamsHomePage onBack={() => handleNavigate('dashboard')} onStartPractice={(exam) => handleNavigate(`test/${encodeURIComponent(exam.category || 'General')}/${encodeURIComponent(exam.title.en)}/20/${encodeURIComponent(exam.title.ml)}`)} />;
             case 'mock_test_home': return <MockTestHomePage onBack={() => handleNavigate('dashboard')} onStartTest={(t) => handleNavigate(`test/mock/${t.id}`)} />;
             case 'psc_live_updates': return <PscLiveUpdatesPage onBack={() => handleNavigate('dashboard')} />;
             case 'previous_papers': return <PreviousPapersPage onBack={() => handleNavigate('dashboard')} />;

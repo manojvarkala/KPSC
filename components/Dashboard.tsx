@@ -8,14 +8,12 @@ import NewsTicker from './NewsTicker';
 import HeroSlider from './HeroSlider';
 import AdsenseWidget from './AdsenseWidget';
 import PscLiveWidget from './PscLiveWidget';
-import QuizHomeWidget from './QuizHomeWidget';
+import PracticeExamsWidget from './PracticeExamsWidget';
 import RotatingDailyWidget from './RotatingDailyWidget';
 import CalendarWidget from './CalendarWidget';
+import { categorizeExams } from '../lib/examUtils';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { ChevronRightIcon } from './icons/ChevronRightIcon';
-import { BeakerIcon } from './icons/BeakerIcon';
-import { ClipboardListIcon } from './icons/ClipboardListIcon';
-import { CalendarDaysIcon } from './icons/CalendarDaysIcon';
 
 const WelcomeBar: React.FC = () => {
     return (
@@ -45,29 +43,7 @@ const Dashboard: React.FC<{ onNavigateToExam: (exam: Exam) => void; onNavigate: 
     }).catch(() => setLoading(false));
   }, []);
 
-  const groupedExams = useMemo(() => {
-    const groups: Record<string, Exam[]> = {};
-    allExams.forEach(exam => {
-        let cat = (exam.category || 'General').trim();
-        // Normalize common variations to ensure grouping works
-        if (cat.toLowerCase() === 'teachers') cat = 'Teachers';
-        if (cat.toLowerCase() === 'kpsc') cat = 'KPSC';
-        if (cat.toLowerCase() === 'general') cat = 'General';
-        
-        if (!groups[cat]) groups[cat] = [];
-        groups[cat].push(exam);
-    });
-    return groups;
-  }, [allExams]);
-
-  const sortedCategoryIds = useMemo(() => {
-    const priority = ['KPSC', 'Teachers', 'Degree Level', '12th Level', '10th Level', 'General', 'Technical', 'Special', 'Live'];
-    const existing = Object.keys(groupedExams);
-    // Combine priority and existing, keeping order of priority and adding others alphabetically
-    const otherCategories = existing.filter(cat => !priority.includes(cat)).sort();
-    const allIds = [...priority.filter(cat => existing.includes(cat)), ...otherCategories];
-    return allIds;
-  }, [groupedExams]);
+  const sections = useMemo(() => categorizeExams(allExams), [allExams]);
 
   const themes: ('indigo' | 'emerald' | 'rose' | 'amber' | 'cyan')[] = ['indigo', 'emerald', 'rose', 'amber', 'cyan'];
 
@@ -77,6 +53,58 @@ const Dashboard: React.FC<{ onNavigateToExam: (exam: Exam) => void; onNavigate: 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[1,2,3].map(i => <div key={i} className="h-64 bg-slate-100 dark:bg-slate-900 rounded-[2.5rem]"></div>)}
         </div>
+    </div>
+  );
+
+  const renderExamSection = (sectionId: string, title: string, data: { groups: Record<string, Exam[]>, ids: string[], total: number }, icon: React.ReactNode) => (
+    <div className="space-y-20">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+            <div className="flex items-center space-x-6">
+                <div className="p-4 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-200 dark:shadow-none">{icon}</div>
+                <div>
+                    <h2 className="text-4xl font-black tracking-tighter text-slate-800 dark:text-white">{title}</h2>
+                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1">Total {data.total} Exams Available</p>
+                </div>
+            </div>
+            <div className="flex items-center space-x-2 px-6 py-3 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
+                <span className="text-2xl font-black text-indigo-600">{data.total}</span>
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-tighter">Exams</span>
+            </div>
+        </div>
+
+        {data.ids.map((catId) => (
+            <section key={catId} className="animate-fade-in-up">
+                <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6 border-b-2 dark:border-slate-800 pb-10">
+                  <div className="flex items-center space-x-6">
+                    <div className="h-16 w-3 bg-indigo-600 rounded-full shadow-lg"></div>
+                    <div>
+                        <h3 className="text-4xl font-black text-slate-800 dark:text-white tracking-tighter">{t(`dashboard.examCategories.${catId}`) || catId}</h3>
+                        <p className="text-slate-400 font-bold uppercase tracking-[0.4em] text-[10px] mt-2">Professional PSC Tracks</p>
+                    </div>
+                  </div>
+                  <button onClick={() => onNavigate('mock_test_home')} className="flex items-center space-x-2 text-indigo-600 font-black uppercase text-[10px] tracking-widest hover:translate-x-2 transition-transform">
+                     <span>View All</span>
+                     <ChevronRightIcon className="h-4 w-4" />
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-10">
+                  {(data.groups[catId] || []).map((exam, idx) => (
+                      <Fragment key={exam.id}>
+                          <div className="h-full flex flex-col">
+                              <ExamCard 
+                                exam={exam} 
+                                onNavigate={onNavigateToExam} 
+                                language={language} 
+                                theme={themes[idx % themes.length]} 
+                              />
+                          </div>
+                          {(idx + 1) % 7 === 0 && <AdsenseWidget />}
+                      </Fragment>
+                  ))}
+                </div>
+            </section>
+        ))}
     </div>
   );
 
@@ -134,45 +162,25 @@ const Dashboard: React.FC<{ onNavigateToExam: (exam: Exam) => void; onNavigate: 
       </section>
       
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-12 px-4">
-        <div className="lg:col-span-3 space-y-24">
-            {sortedCategoryIds.map((catId) => (
-                <section key={catId} className="animate-fade-in-up">
-                    <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6 border-b-2 dark:border-slate-800 pb-10">
-                      <div className="flex items-center space-x-6">
-                        <div className="h-16 w-3 bg-indigo-600 rounded-full shadow-lg"></div>
-                        <div>
-                            <h3 className="text-4xl font-black text-slate-800 dark:text-white tracking-tighter">{t(`dashboard.examCategories.${catId}`) || catId}</h3>
-                            <p className="text-slate-400 font-bold uppercase tracking-[0.4em] text-[10px] mt-2">Professional PSC Tracks</p>
-                        </div>
-                      </div>
-                      <button onClick={() => onNavigate('mock_test_home')} className="flex items-center space-x-2 text-indigo-600 font-black uppercase text-[10px] tracking-widest hover:translate-x-2 transition-transform">
-                         <span>View All</span>
-                         <ChevronRightIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-10">
-                      {(groupedExams[catId] || []).map((exam, idx) => (
-                          <Fragment key={exam.id}>
-                              <div className="h-full flex flex-col">
-                                  <ExamCard 
-                                    exam={exam} 
-                                    onNavigate={onNavigateToExam} 
-                                    language={language} 
-                                    theme={themes[idx % themes.length]} 
-                                  />
-                              </div>
-                              {(idx + 1) % 7 === 0 && <AdsenseWidget />}
-                          </Fragment>
-                      ))}
-                    </div>
-                </section>
-            ))}
+        <div className="lg:col-span-3 space-y-32">
+            {renderExamSection(
+                'mock_tests', 
+                t('dashboard.examCategories.mockTests'), 
+                sections.mock, 
+                <ClipboardListIcon className="h-8 w-8 text-white" />
+            )}
+            
+            {renderExamSection(
+                'practice_exams', 
+                t('dashboard.examCategories.practiceExams'), 
+                sections.practice, 
+                <BeakerIcon className="h-8 w-8 text-white" />
+            )}
         </div>
 
         <aside className="hidden lg:block space-y-8">
             <PscLiveWidget onNavigate={() => onNavigate('psc_live_updates')} />
-            <QuizHomeWidget onNavigate={() => onNavigate('quiz_home')} />
+            <PracticeExamsWidget onNavigate={() => onNavigate('quiz_home')} />
             <CalendarWidget onNavigate={() => onNavigate('exam_calendar')} />
             <div className="sticky top-28 py-4 flex flex-col gap-4">
                 <AdsenseWidget />

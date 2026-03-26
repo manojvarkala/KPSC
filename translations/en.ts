@@ -38,6 +38,7 @@ export const translations = {
     dailyFacts: "Daily Facts",
     resources: "Resources",
     quizzes: "Quizzes",
+    practiceExams: "Practice Exams",
     mockTests: "Mock Tests",
     studyMaterials: "Study Materials",
     currentAffairs: "Current Affairs",
@@ -102,7 +103,9 @@ export const translations = {
       Teachers: "Teachers Exams",
       Technical: "Technical Exams",
       Special: "Special Exams",
-      Live: "New Notifications"
+      Live: "New Notifications",
+      practiceExams: "Practice Exams (Subject-wise)",
+      mockTests: "Mock Tests (Preliminary & Main Models)"
     },
     notifications: {
         title: "Latest Notifications",

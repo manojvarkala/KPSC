@@ -1,38 +1,31 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeftIcon } from '../icons/ChevronLeftIcon';
-import { DocumentChartBarIcon } from '../icons/DocumentChartBarIcon';
-import ProBadge from '../ProBadge';
-import type { MockTest, Exam } from '../../types';
+import { BeakerIcon } from '../icons/BeakerIcon';
+import type { Exam } from '../../types';
 import { useTranslation } from '../../contexts/LanguageContext';
-import { ClockIcon } from '../icons/ClockIcon';
 import { getExams } from '../../services/pscDataService';
 import { categorizeExams } from '../../lib/examUtils';
 
-interface MockTestCardProps {
+interface PracticeCardProps {
   exam: Exam;
   onStart: (exam: Exam) => void;
 }
 
-const MockTestCard: React.FC<MockTestCardProps> = ({ exam, onStart }) => {
+const PracticeCard: React.FC<PracticeCardProps> = ({ exam, onStart }) => {
   const { t, language } = useTranslation();
-  const isPro = exam.level?.toLowerCase().includes('pro');
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-[3rem] shadow-xl hover:shadow-2xl hover:-translate-y-2 transform transition-all duration-500 flex flex-col border-2 border-slate-100 dark:border-slate-800 group relative overflow-hidden h-full">
-      <div className="h-3 w-full bg-gradient-to-r from-indigo-600 to-blue-600"></div>
+      <div className="h-3 w-full bg-gradient-to-r from-emerald-600 to-teal-600"></div>
       
       <div className="p-8 flex flex-col h-full">
         <div className="flex items-start space-x-5 mb-6">
-          <div className="p-4 rounded-2xl shadow-inner group-hover:rotate-3 transition-transform bg-indigo-50 dark:bg-indigo-950 text-indigo-600 border dark:border-slate-800">
-             {exam.icon || <DocumentChartBarIcon className="h-8 w-8" />}
+          <div className="p-4 rounded-2xl shadow-inner group-hover:rotate-3 transition-transform bg-emerald-50 dark:bg-emerald-950 text-emerald-600 border dark:border-slate-800">
+             {exam.icon || <BeakerIcon className="h-8 w-8" />}
           </div>
           <div className="flex-1">
-              <div className="flex items-center flex-wrap gap-2 mb-1">
-                <h4 className="text-xl font-black text-slate-800 dark:text-white leading-tight tracking-tight group-hover:text-indigo-600 transition-colors">{exam.title[language]}</h4>
-                {isPro && <ProBadge />}
-              </div>
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{exam.category || 'PSC Official'}</span>
+              <h4 className="text-xl font-black text-slate-800 dark:text-white leading-tight tracking-tight group-hover:text-emerald-600 transition-colors mb-1">{exam.title[language]}</h4>
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{exam.category || 'Practice'}</span>
           </div>
         </div>
         
@@ -41,9 +34,9 @@ const MockTestCard: React.FC<MockTestCardProps> = ({ exam, onStart }) => {
         <div className="mt-auto">
             <button 
               onClick={() => onStart(exam)}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-2xl shadow-lg transition-all active:scale-95 text-xs uppercase tracking-widest"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-2xl shadow-lg transition-all active:scale-95 text-xs uppercase tracking-widest"
             >
-              പരീക്ഷ ആരംഭിക്കുക
+              പരിശീലനം ആരംഭിക്കുക
             </button>
         </div>
       </div>
@@ -53,10 +46,10 @@ const MockTestCard: React.FC<MockTestCardProps> = ({ exam, onStart }) => {
 
 interface PageProps {
   onBack: () => void;
-  onStartTest: (exam: Exam) => void;
+  onStartPractice: (exam: Exam) => void;
 }
 
-const MockTestHomePage: React.FC<PageProps> = ({ onBack, onStartTest }) => {
+const PracticeExamsHomePage: React.FC<PageProps> = ({ onBack, onStartPractice }) => {
   const { t, language } = useTranslation();
   const [allExams, setAllExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +61,7 @@ const MockTestHomePage: React.FC<PageProps> = ({ onBack, onStartTest }) => {
     }).catch(() => setLoading(false));
   }, []);
 
-  const mockData = useMemo(() => categorizeExams(allExams).mock, [allExams]);
+  const practiceData = useMemo(() => categorizeExams(allExams).practice, [allExams]);
 
   return (
     <div className="animate-fade-in pb-32 max-w-7xl mx-auto px-4">
@@ -80,10 +73,10 @@ const MockTestHomePage: React.FC<PageProps> = ({ onBack, onStartTest }) => {
       <header className="mb-12">
         <div className="space-y-4">
           <h1 className="text-5xl font-black text-slate-800 dark:text-white tracking-tighter leading-none">
-            {t('dashboard.examCategories.mockTests')}
+            {t('nav.practiceExams')}
           </h1>
           <p className="text-lg text-slate-500 font-bold max-w-2xl leading-relaxed">
-            കേരള PSC ഒറിജിനൽ പരീക്ഷയുടെ അതേ സിലബസ്സിലും സമയക്രമത്തിലും തയ്യാറാക്കിയ മോഡൽ പരീക്ഷകൾ.
+            ഓരോ വിഷയങ്ങളും ആഴത്തിൽ പഠിക്കാനായി തയ്യാറാക്കിയ പ്രാക്ടീസ് പരീക്ഷകൾ.
           </p>
         </div>
       </header>
@@ -94,19 +87,19 @@ const MockTestHomePage: React.FC<PageProps> = ({ onBack, onStartTest }) => {
             <div key={i} className="h-64 bg-slate-100 dark:bg-slate-900 rounded-[3rem]"></div>
           ))}
         </div>
-      ) : mockData.total > 0 ? (
+      ) : practiceData.total > 0 ? (
         <div className="space-y-16">
-          {mockData.ids.map(catId => (
+          {practiceData.ids.map(catId => (
             <div key={catId} className="space-y-8">
               <div className="flex items-center space-x-4">
-                <div className="h-10 w-2 bg-indigo-600 rounded-full"></div>
+                <div className="h-10 w-2 bg-emerald-600 rounded-full"></div>
                 <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">
                   {t(`dashboard.examCategories.${catId}`) || catId}
                 </h2>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {mockData.groups[catId].map((exam) => (
-                  <MockTestCard key={exam.id} exam={exam} onStart={onStartTest} />
+                {practiceData.groups[catId].map((exam) => (
+                  <PracticeCard key={exam.id} exam={exam} onStart={onStartPractice} />
                 ))}
               </div>
             </div>
@@ -114,11 +107,11 @@ const MockTestHomePage: React.FC<PageProps> = ({ onBack, onStartTest }) => {
         </div>
       ) : (
         <div className="text-center py-40 bg-white dark:bg-slate-900 rounded-[3rem] border-2 border-dashed border-slate-100 dark:border-slate-800 shadow-inner">
-           <p className="text-2xl font-black text-slate-300 dark:text-slate-700 tracking-tighter">Updating Exam Hall...</p>
+           <p className="text-2xl font-black text-slate-300 dark:text-slate-700 tracking-tighter">Updating Practice Hall...</p>
         </div>
       )}
     </div>
   );
 };
 
-export default MockTestHomePage;
+export default PracticeExamsHomePage;

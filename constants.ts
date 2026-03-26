@@ -227,7 +227,7 @@ export const EXAM_CONTENT_MAP: Record<string, ExamPageContent> = {
 
 export const NAV_STRUCTURE: NavLink[] = [
   { nameKey: 'nav.home', target: 'dashboard' },
-  { nameKey: 'nav.practice', children: [{ nameKey: 'nav.mockTests', target: 'mock_test_home' }, { nameKey: 'nav.quizzes', target: 'quiz_home' }] },
+  { nameKey: 'nav.practice', children: [{ nameKey: 'nav.mockTests', target: 'mock_test_home' }, { nameKey: 'nav.practiceExams', target: 'quiz_home' }] },
   { nameKey: 'nav.dailyFacts', children: [
       { nameKey: 'nav.currentAffairs', target: 'current_affairs' }, 
       { nameKey: 'nav.gk', target: 'gk' }, 
