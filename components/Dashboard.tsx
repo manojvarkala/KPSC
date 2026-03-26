@@ -14,6 +14,9 @@ import CalendarWidget from './CalendarWidget';
 import { categorizeExams } from '../lib/examUtils';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { ChevronRightIcon } from './icons/ChevronRightIcon';
+import { BeakerIcon } from './icons/BeakerIcon';
+import { ClipboardListIcon } from './icons/ClipboardListIcon';
+import { CalendarDaysIcon } from './icons/CalendarDaysIcon';
 
 const WelcomeBar: React.FC = () => {
     return (

@@ -19,16 +19,54 @@ import { BeakerIcon } from '../components/icons/BeakerIcon';
 import { LightBulbIcon } from '../components/icons/LightBulbIcon';
 import { StarIcon } from '../components/icons/StarIcon';
 import { GlobeAltIcon } from '../components/icons/GlobeAltIcon';
+import { Cog6ToothIcon } from '../components/icons/Cog6ToothIcon';
+import { ScaleIcon } from '../components/icons/ScaleIcon';
+import { ClipboardListIcon } from '../components/icons/ClipboardListIcon';
+import { WrenchScrewdriverIcon } from '../components/icons/WrenchScrewdriverIcon';
+import { SparklesIcon } from '../components/icons/SparklesIcon';
+import { TrophyIcon } from '../components/icons/TrophyIcon';
+import { UserGroupIcon } from '../components/icons/UserGroupIcon';
+import { NewspaperIcon } from '../components/icons/NewspaperIcon';
+import { MegaphoneIcon } from '../components/icons/MegaphoneIcon';
+import { LanguageIcon } from '../components/icons/LanguageIcon';
+import { ClockIcon } from '../components/icons/ClockIcon';
+import { CalendarDaysIcon } from '../components/icons/CalendarDaysIcon';
+import { BellIcon } from '../components/icons/BellIcon';
+import { ArchiveBoxIcon } from '../components/icons/ArchiveBoxIcon';
+import { DocumentTextIcon } from '../components/icons/DocumentTextIcon';
 
 let isFetchingExams = false;
 
 const getIcon = (type: string) => {
     const icons: Record<string, any> = {
-        'book': BookOpenIcon, 'shield': ShieldCheckIcon, 'cap': AcademicCapIcon,
-        'beaker': BeakerIcon, 'light': LightBulbIcon, 'star': StarIcon, 'globe': GlobeAltIcon
+        'book': BookOpenIcon, 
+        'shield': ShieldCheckIcon, 
+        'cap': AcademicCapIcon,
+        'beaker': BeakerIcon, 
+        'light': LightBulbIcon, 
+        'star': StarIcon, 
+        'globe': GlobeAltIcon,
+        'cog': Cog6ToothIcon,
+        'scale': ScaleIcon,
+        'list': ClipboardListIcon,
+        'wrench': WrenchScrewdriverIcon,
+        'sparkles': SparklesIcon,
+        'trophy': TrophyIcon,
+        'users': UserGroupIcon,
+        'news': NewspaperIcon,
+        'megaphone': MegaphoneIcon,
+        'language': LanguageIcon,
+        'clock': ClockIcon,
+        'calendar': CalendarDaysIcon,
+        'bell': BellIcon,
+        'archive': ArchiveBoxIcon,
+        'document': DocumentTextIcon
     };
-    const IconComp = icons[String(type || 'book').toLowerCase()] || BookOpenIcon;
-    return React.createElement(IconComp, { className: "h-8 w-8 text-indigo-500" });
+    
+    const iconKey = String(type || 'book').toLowerCase();
+    const IconComp = icons[iconKey] || BookOpenIcon;
+    
+    return React.createElement(IconComp, { className: "h-8 w-8" });
 };
 
 const fetchWithTimeout = async (url: string, timeout = 5000) => {

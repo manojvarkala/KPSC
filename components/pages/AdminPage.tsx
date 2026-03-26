@@ -979,7 +979,9 @@ const AdminPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     {(Array.isArray(exams) ? exams : []).map(ex => (
                                         <div key={ex.id} className="bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between shadow-sm">
                                             <div className="flex items-center space-x-4">
-                                                <div className="p-3 bg-white dark:bg-slate-800 rounded-xl shadow-sm"><AcademicCapIcon className="h-6 w-6 text-indigo-600" /></div>
+                                                <div className="p-3 bg-white dark:bg-slate-800 rounded-xl shadow-sm flex items-center justify-center w-12 h-12">
+                                                    {ex.icon || <AcademicCapIcon className="h-6 w-6 text-indigo-600" />}
+                                                </div>
                                                 <div>
                                                     <h4 className="font-black text-sm uppercase">{ex.title.ml}</h4>
                                                     <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold">{ex.category} • {ex.level}</p>
