@@ -25,11 +25,11 @@ const createNumericHash = (str: string): number => {
 
 export const APPROVED_SUBJECTS = [
     "Arts, Culture & Sports", "Biology / Life Science", "Chemistry", "Computer Science / IT / Cyber Laws",
-    "Current Affairs", "Educational Psychology / Pedagogy", "Electrical Engineering", "English",
+    "Current Affairs", "Educational Psychology / Pedagogy", "Electrical Engineering", "General English", "English",
     "Environment", "General Knowledge", "General Knowledge / Static GK", "General Science / Science & Tech",
-    "Indian Economy", "Indian Geography", "Indian History", "Indian Polity / Constitution",
+    "Indian Economy", "Indian Geography", "Indian History", "Indian Polity", "Indian Polity / Constitution",
     "Kerala Geography", "Kerala History", "Kerala History / Renaissance", "Kerala History & Renaissance", "Kerala Specific GK",
-    "Malayalam", "Nursing Science / Health Care", "Physics", "Quantitative Aptitude",
+    "Malayalam", "General Malayalam", "Nursing Science / Health Care", "Physics", "Quantitative Aptitude",
     "Reasoning / Mental Ability", "Social Science / Sociology", "Mathematics", "Botany", "Zoology",
     "Economics", "Political Science", "Statistics", "Geography", "Sanskrit", "Kannada", "Philosophy",
     "Psychology", "Commerce", "Physical Education", "Music", "Arabic", "Hindi",
