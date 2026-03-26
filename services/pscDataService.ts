@@ -66,7 +66,12 @@ const getIcon = (type: string) => {
     const iconKey = String(type || 'book').toLowerCase();
     const IconComp = icons[iconKey] || BookOpenIcon;
     
-    return React.createElement(IconComp, { className: "h-8 w-8" });
+    try {
+        return React.createElement(IconComp, { className: "h-8 w-8" });
+    } catch (e) {
+        console.error(`Error rendering icon ${iconKey}:`, e);
+        return React.createElement(BookOpenIcon, { className: "h-8 w-8" });
+    }
 };
 
 const fetchWithTimeout = async (url: string, timeout = 5000) => {
