@@ -15,7 +15,7 @@ export interface ExamSections {
 }
 
 export const categorizeExams = (allExams: Exam[]): ExamSections => {
-  const mockCategories = ['KPSC', 'Teachers', 'Degree Level', '12th Level', '10th Level'];
+  const mockCategories = ['KPSC', 'Teachers', 'Degree Level', '12th Level', '10th Level', 'Cultural Subjects'];
   const mockGroups: Record<string, Exam[]> = {};
   const practiceGroups: Record<string, Exam[]> = {};
 
@@ -23,6 +23,7 @@ export const categorizeExams = (allExams: Exam[]): ExamSections => {
     let cat = (exam.category || 'General').trim();
     if (cat.toLowerCase() === 'teachers') cat = 'Teachers';
     if (cat.toLowerCase() === 'kpsc') cat = 'KPSC';
+    if (cat.toLowerCase() === 'cultural subjects') cat = 'Cultural Subjects';
     
     const titleEn = exam.title.en.toLowerCase();
     const titleMl = exam.title.ml.toLowerCase();

@@ -1242,6 +1242,17 @@ export async function syncAllFromSheetsToSupabase(targetTable?: string) {
                 difficulty: r[5 + offset] || 'PSC Level',
                 explanation: r[6 + offset] || ''
             })
+        },
+        {
+            sheet: 'FlashCards',
+            supabase: 'flashcards',
+            map: (r: any[], offset: number) => ({
+                id: r[0 + offset] ? parseInt(String(r[0 + offset])) : createNumericHash(String(r[1 + offset] || '') + String(r[3 + offset] || '')),
+                front: r[1 + offset],
+                back: r[2 + offset],
+                topic: r[3 + offset] || 'General',
+                explanation: r[4 + offset] || ''
+            })
         }
     ];
 
@@ -1360,4 +1371,8 @@ export async function syncAllFromSheetsToSupabase(targetTable?: string) {
         message: targetTable ? `Sync for ${targetTable} complete.` : "Full database sync complete.",
         report 
     };
+}
+
+export async function syncFlashCardsFromSheetsToSupabase() {
+    return syncAllFromSheetsToSupabase('flashcards');
 }

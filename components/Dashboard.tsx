@@ -141,21 +141,18 @@ const Dashboard: React.FC<{ onNavigateToExam: (exam: Exam) => void; onNavigate: 
       <section className="px-4">
           <div className="flex items-center space-x-4 mb-8">
               <div className="h-10 w-2 bg-rose-600 rounded-full"></div>
-              <h3 className="text-3xl font-black tracking-tighter">വിഷയങ്ങൾ തിരിച്ചു പഠിക്കാം</h3>
+              <h3 className="text-3xl font-black tracking-tighter">പരിശീലന പരീക്ഷകൾ</h3>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {[
-                  "General Knowledge", "Malayalam", "English", "Quantitative Aptitude", 
-                  "Reasoning / Mental Ability", "General Science / Science & Tech",
-                  "Indian History", "Indian Geography", "Indian Polity / Constitution",
-                  "Kerala History", "Kerala Geography", "Current Affairs"
-              ].map(subject => (
+              {sections.practice.ids.map(catId => (
                   <button 
-                    key={subject}
-                    onClick={() => onStartStudy(subject)}
+                    key={catId}
+                    onClick={() => onNavigate('practice_exams_home')}
                     className="p-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl text-center hover:border-indigo-500 hover:shadow-md transition-all group"
                   >
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-hover:text-indigo-600">{subject}</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-hover:text-indigo-600">
+                          {t(`dashboard.examCategories.${catId}`) || catId}
+                      </span>
                   </button>
               ))}
           </div>

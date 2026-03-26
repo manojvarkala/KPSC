@@ -8,15 +8,17 @@ import { useTranslation } from '../../contexts/LanguageContext';
 import { ClockIcon } from '../icons/ClockIcon';
 import { getExams } from '../../services/pscDataService';
 import { categorizeExams } from '../../lib/examUtils';
+import { MOCK_TESTS_DATA } from '../../constants';
 
 interface MockTestCardProps {
-  exam: Exam;
-  onStart: (exam: Exam) => void;
+  exam: Exam | MockTest;
+  onStart: (exam: any) => void;
 }
 
 const MockTestCard: React.FC<MockTestCardProps> = ({ exam, onStart }) => {
   const { t, language } = useTranslation();
-  const isPro = exam.level?.toLowerCase().includes('pro');
+  const isPro = 'level' in exam ? exam.level?.toLowerCase().includes('pro') : exam.isPro;
+  const category = 'category' in exam ? exam.category : 'Full Mock Test';
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-[3rem] shadow-xl hover:shadow-2xl hover:-translate-y-2 transform transition-all duration-500 flex flex-col border-2 border-slate-100 dark:border-slate-800 group relative overflow-hidden h-full">
@@ -25,14 +27,14 @@ const MockTestCard: React.FC<MockTestCardProps> = ({ exam, onStart }) => {
       <div className="p-8 flex flex-col h-full">
         <div className="flex items-start space-x-5 mb-6">
           <div className="p-4 rounded-2xl shadow-inner group-hover:rotate-3 transition-transform bg-indigo-50 dark:bg-indigo-950 text-indigo-600 border dark:border-slate-800">
-             {exam.icon || <DocumentChartBarIcon className="h-8 w-8" />}
+             {('icon' in exam && exam.icon) || <DocumentChartBarIcon className="h-8 w-8" />}
           </div>
           <div className="flex-1">
               <div className="flex items-center flex-wrap gap-2 mb-1">
                 <h4 className="text-xl font-black text-slate-800 dark:text-white leading-tight tracking-tight group-hover:text-indigo-600 transition-colors">{exam.title[language]}</h4>
                 {isPro && <ProBadge />}
               </div>
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{exam.category || 'PSC Official'}</span>
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{category || 'PSC Official'}</span>
           </div>
         </div>
         
@@ -43,7 +45,7 @@ const MockTestCard: React.FC<MockTestCardProps> = ({ exam, onStart }) => {
               onClick={() => onStart(exam)}
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-2xl shadow-lg transition-all active:scale-95 text-xs uppercase tracking-widest"
             >
-              പരീക്ഷ ആരംഭിക്കുക
+              {language === 'ml' ? 'പരീക്ഷ ആരംഭിക്കുക' : 'Start Exam'}
             </button>
         </div>
       </div>
@@ -53,7 +55,7 @@ const MockTestCard: React.FC<MockTestCardProps> = ({ exam, onStart }) => {
 
 interface PageProps {
   onBack: () => void;
-  onStartTest: (exam: Exam) => void;
+  onStartTest: (exam: any) => void;
 }
 
 const MockTestHomePage: React.FC<PageProps> = ({ onBack, onStartTest }) => {
@@ -94,8 +96,24 @@ const MockTestHomePage: React.FC<PageProps> = ({ onBack, onStartTest }) => {
             <div key={i} className="h-64 bg-slate-100 dark:bg-slate-900 rounded-[3rem]"></div>
           ))}
         </div>
-      ) : mockData.total > 0 ? (
+      ) : (
         <div className="space-y-16">
+          {/* Full Mock Tests Section */}
+          <div className="space-y-8">
+            <div className="flex items-center space-x-4">
+              <div className="h-10 w-2 bg-rose-600 rounded-full"></div>
+              <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">
+                {language === 'ml' ? 'പൂർണ്ണ മോക്ക് ടെസ്റ്റുകൾ' : 'Full Mock Tests'}
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {MOCK_TESTS_DATA.map((mt) => (
+                <MockTestCard key={mt.id} exam={mt} onStart={onStartTest} />
+              ))}
+            </div>
+          </div>
+
+          {/* Categorized Mock Tests */}
           {mockData.ids.map(catId => (
             <div key={catId} className="space-y-8">
               <div className="flex items-center space-x-4">
@@ -111,10 +129,6 @@ const MockTestHomePage: React.FC<PageProps> = ({ onBack, onStartTest }) => {
               </div>
             </div>
           ))}
-        </div>
-      ) : (
-        <div className="text-center py-40 bg-white dark:bg-slate-900 rounded-[3rem] border-2 border-dashed border-slate-100 dark:border-slate-800 shadow-inner">
-           <p className="text-2xl font-black text-slate-300 dark:text-slate-700 tracking-tighter">Updating Exam Hall...</p>
         </div>
       )}
     </div>

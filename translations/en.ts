@@ -100,9 +100,10 @@ export const translations = {
     topCourses: "Top Courses",
     examCategories: {
       General: "General Exams",
-      Teachers: "Teachers Exams",
+      Teachers: "Teaching Posts",
       Technical: "Technical Exams",
       Special: "Special Exams",
+      CulturalSubjects: "Cultural Subjects",
       Live: "New Notifications",
       practiceExams: "Practice Exams (Subject-wise)",
       mockTests: "Mock Tests (Preliminary & Main Models)"

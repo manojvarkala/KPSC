@@ -103,9 +103,10 @@ export const translations = {
     topCourses: "പ്രധാന കോഴ്സുകൾ",
     examCategories: {
       General: "ജനറൽ പരീക്ഷകൾ",
-      Teachers: "അധ്യാപക പരീക്ഷകൾ",
+      Teachers: "അധ്യാപക തസ്തികകൾ",
       Technical: "സാങ്കേതിക പരീക്ഷകൾ",
       Special: "സ്പെഷ്യൽ പരീക്ഷകൾ",
+      CulturalSubjects: "സാംസ്കാരിക വിഷയങ്ങൾ",
       Live: "പുതിയ അറിയിപ്പുകൾ",
       practiceExams: "പ്രാക്ടീസ് പരീക്ഷകൾ (വിഷയങ്ങൾ അനുസരിച്ച്)",
       mockTests: "മോക്ക് ടെസ്റ്റുകൾ (പ്രിലിമിനറി & മെയിൻ മോഡലുകൾ)"

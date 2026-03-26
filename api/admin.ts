@@ -12,6 +12,7 @@ import {
     generateFlashCards,
     generateSyllabusForExam,
     syncAllFromSheetsToSupabase,
+    syncFlashCardsFromSheetsToSupabase,
     syncSupabaseToSheets,
     repairLanguageMismatches,
     repairBlankTopics,
@@ -138,6 +139,7 @@ export default async function handler(req: any, res: any) {
             case 'sync-syllabus': return res.status(200).json(await syncAllFromSheetsToSupabase('syllabus'));
             case 'sync-mappings': return res.status(200).json(await syncAllFromSheetsToSupabase('topic_mappings'));
             case 'sync-qbank': return res.status(200).json(await syncAllFromSheetsToSupabase('questionbank'));
+            case 'sync-flashcards': return res.status(200).json(await syncFlashCardsFromSheetsToSupabase());
             case 'sync-to-sheets': return res.status(200).json(await syncSupabaseToSheets());
             case 'run-daily-sync': return res.status(200).json(await runDailyUpdateScrapers());
             case 'run-gk-scraper': return res.status(200).json(await scrapeGkFacts());
